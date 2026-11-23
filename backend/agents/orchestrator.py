@@ -139,26 +139,36 @@ async def run_react(
 
 async def _call_ollama_tools(messages: list) -> dict:
     """Single Ollama call with tool schemas"""
+    import os
+    openrouter_key = os.getenv("OPENROUTER_KEY", "")
+    if openrouter_key:
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {openrouter_key}",
+            "HTTP-Referer": "https://geovia.local",
+            "X-Title": "geoVIA",
+            "Content-Type": "application/json"
+        }
+        payload = {"model": MODEL, "messages": messages, "tools": TOOL_SCHEMAS}
+    else:
+        url = f"{OLLAMA_URL}/api/chat"
+        headers = {}
+        payload = {"model": MODEL, "messages": messages, "tools": TOOL_SCHEMAS, "stream": False}
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            r = await client.post(
-                f"{OLLAMA_URL}/api/chat",
-                json={
-                    "model": MODEL,
-                    "messages": messages,
-                    "tools": TOOL_SCHEMAS,
-                    "stream": False
-                }
-            )
+        async with httpx.AsyncClient(timeout=120, verify=False) as client:
+            r = await client.post(url, headers=headers, json=payload)
             if r.status_code == 200:
                 data = r.json()
-                # Strip think blocks
+                # Normalize OpenRouter response to Ollama format
+                if openrouter_key and "choices" in data:
+                    msg = data["choices"][0]["message"]
+                    data = {"message": msg}
                 content = data.get("message", {}).get("content", "")
                 if content and "<think>" in content and "</think>" in content:
                     content = content.split("</think>")[-1].strip()
                     data["message"]["content"] = content
                 return data
-            print(f"[ReAct] Ollama status={r.status_code}")
+            print(f"[ReAct] status={r.status_code} {r.text[:200]}")
     except Exception as e:
         print(f"[ReAct] {e}")
     return {}

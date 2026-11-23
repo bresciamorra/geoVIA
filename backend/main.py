@@ -418,9 +418,10 @@ async def _stream_ollama(ws: WebSocket, conversation: list, model: str = None, s
             headers = {
                 "Authorization": f"Bearer {OPENROUTER_KEY}",
                 "HTTP-Referer": "https://geovia.local",
-                "X-Title": "geoVIA"
+                "X-Title": "geoVIA",
+                "Content-Type": "application/json"
             }
-            async with httpx.AsyncClient(timeout=120) as client:
+            async with httpx.AsyncClient(timeout=120, verify=False) as client:
                 async with client.stream("POST", "https://openrouter.ai/api/v1/chat/completions",
                     headers=headers,
                     json={"model": model, "messages": messages, "stream": True}) as r:
