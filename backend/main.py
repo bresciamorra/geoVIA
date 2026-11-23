@@ -141,8 +141,7 @@ async def http_chat(req: HttpChatRequest):
         conversation = req.conversation + [{"role": "user", "content": req.message}]
         messages = [{"role": "system", "content": SYSTEM_PROMPT_CHAT}] + conversation
         if HF_TOKEN:
-            # HuggingFace Inference API
-            url = f"https://router.huggingface.co/novita/v3/openai/chat/completions"
+            url = "https://api-inference.huggingface.co/models/" + HF_MODEL + "/v1/chat/completions"
             headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
             async with httpx.AsyncClient(timeout=60, verify=False) as client:
                 r = await client.post(url, headers=headers,
