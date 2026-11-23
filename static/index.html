@@ -1164,6 +1164,7 @@ function removeTyping() {
   if (old) old.id = '';
 }
 
+let httpConversation = [];
 let reactMode = false;
 
 function toggleReactMode() {
@@ -1179,32 +1180,41 @@ function toggleReactMode() {
     document.getElementById('aiInput').placeholder = "Chiedi all'assistente VIA...";
   }
 }
-
-function sendAiChat() {
   const input = document.getElementById('aiInput');
   const msg = input.value.trim();
-  if (!msg || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (!msg) return;
   input.value = '';
   addAiMsg(msg, 'user');
 
-  if (reactMode) {
-    // ReAct mode: send with context and tool calling
+  if (reactMode && ws && ws.readyState === WebSocket.OPEN) {
     addTyping();
     const context = currentResult ? {
       geojson: drawnGeojson ? JSON.stringify(drawnGeojson) : null,
       project_type: currentResult.project_type || document.getElementById('projectType').value,
       project_name: currentResult.project_name || document.getElementById('projectName').value,
-      lat: currentResult.lat, lon: currentResult.lon,
-      area_m2: currentResult.area_m2
-    } : {
-      geojson: drawnGeojson ? JSON.stringify(drawnGeojson) : null,
-      project_type: document.getElementById('projectType').value,
-      project_name: document.getElementById('projectName').value,
-    };
+      lat: currentResult.lat, lon: currentResult.lon, area_m2: currentResult.area_m2
+    } : { geojson: drawnGeojson ? JSON.stringify(drawnGeojson) : null };
     ws.send(JSON.stringify({ type: 'react', message: msg, context }));
-  } else {
+  } else if (ws && ws.readyState === WebSocket.OPEN) {
     addTyping();
     ws.send(JSON.stringify({ type: 'chat', message: msg }));
+  } else {
+    // HTTP fallback
+    addTyping();
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message: msg, conversation: httpConversation})
+      });
+      const data = await res.json();
+      removeTyping();
+      httpConversation = data.conversation || [];
+      addAiMsg(data.response || 'Nessuna risposta', 'ai');
+    } catch(e) {
+      removeTyping();
+      addAiMsg(`Errore: ${e.message}`, 'ai');
+    }
   }
 }
 

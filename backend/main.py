@@ -125,6 +125,43 @@ class ReactChatRequest(BaseModel):
     lon: float = 0
     area_m2: float = 0
 
+
+class HttpChatRequest(BaseModel):
+    message: str
+    conversation: list = []
+
+@app.post("/api/chat")
+async def http_chat(req: HttpChatRequest):
+    """HTTP chat — works on Railway where WebSocket drops"""
+    try:
+        conversation = req.conversation + [{"role": "user", "content": req.message}]
+        messages = [{"role": "system", "content": SYSTEM_PROMPT_CHAT}] + conversation
+        if OPENROUTER_KEY:
+            headers = {"Authorization": f"Bearer {OPENROUTER_KEY}",
+                       "HTTP-Referer": "https://geovia.local",
+                       "X-Title": "geoVIA", "Content-Type": "application/json"}
+            async with httpx.AsyncClient(timeout=60, verify=False) as client:
+                r = await client.post("https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers, json={"model": OLLAMA_MODEL_CHAT, "messages": messages})
+                if r.status_code == 200:
+                    content = r.json()["choices"][0]["message"]["content"]
+                    return {"response": content,
+                            "conversation": conversation + [{"role": "assistant", "content": content}]}
+                return {"response": f"Errore: {r.status_code} {r.text[:100]}", "conversation": conversation}
+        else:
+            async with httpx.AsyncClient(timeout=60) as client:
+                r = await client.post(f"{OLLAMA_URL}/api/chat",
+                    json={"model": OLLAMA_MODEL_CHAT, "messages": messages, "stream": False})
+                if r.status_code == 200:
+                    content = r.json().get("message", {}).get("content", "")
+                    return {"response": content,
+                            "conversation": conversation + [{"role": "assistant", "content": content}]}
+                return {"response": "Errore Ollama", "conversation": conversation}
+    except Exception as e:
+        traceback.print_exc()
+        return {"response": f"Errore: {str(e)}", "conversation": req.conversation}
+
+
 @app.post("/api/chat/analyze")
 async def chat_analyze(req: ReactChatRequest):
     """ReAct orchestrator — AI decides which tools to call"""
