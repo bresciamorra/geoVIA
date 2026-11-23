@@ -42,8 +42,8 @@ OPENROUTER_KEY = os.getenv("OPENROUTER_KEY", "")
 # If OpenRouter key is set, use OpenRouter instead of Ollama
 if OPENROUTER_KEY:
     OLLAMA_URL = "https://openrouter.ai/api/v1"
-    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistralai/mistral-7b-instruct:free")
-    OLLAMA_MODEL_CHAT = os.getenv("OLLAMA_MODEL_CHAT", "mistralai/mistral-7b-instruct:free")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "meta-llama/llama-3.2-3b-instruct:free")
+    OLLAMA_MODEL_CHAT = os.getenv("OLLAMA_MODEL_CHAT", "meta-llama/llama-3.2-3b-instruct:free")
     print(f"[LLM] Using OpenRouter: {OLLAMA_MODEL}")
 else:
     print(f"[LLM] Using Ollama: {OLLAMA_URL} model={OLLAMA_MODEL}")
@@ -355,7 +355,12 @@ async def ai_chat(ws: WebSocket):
     conversation = []
     try:
         while True:
-            raw = await ws.receive_text()
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=30)
+            except asyncio.TimeoutError:
+                # Keepalive ping
+                await ws.send_json({"type": "ping"})
+                continue
             data = json.loads(raw)
 
             if data.get("type") == "interpret":

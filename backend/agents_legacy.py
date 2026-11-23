@@ -16,7 +16,7 @@ MODEL_SYNTHESIS = os.getenv("OLLAMA_MODEL", "hermes3:8b")
 # Override for OpenRouter
 import os as _os
 if _os.getenv("OPENROUTER_KEY"):
-    MODEL_FAST = _os.getenv("OLLAMA_MODEL", "mistralai/mistral-7b-instruct:free")
+    MODEL_FAST = _os.getenv("OLLAMA_MODEL", "meta-llama/llama-3.2-3b-instruct:free")
     MODEL_SYNTHESIS = MODEL_FAST
 
 # ── NORMATIVE KNOWLEDGE BASE ──────────────────────────────────────────────────

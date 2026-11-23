@@ -1098,6 +1098,7 @@ function connectWS() {
   ws.onerror = (e) => console.error('[WS] error:', e);
   ws.onmessage = (e) => {
     const data = JSON.parse(e.data);
+    if (data.type === 'ping') { ws.send(JSON.stringify({type:'pong'})); return; }
     if (data.type === 'ai_start') { removeTyping(); addStreamMsg(); }
     else if (data.type === 'ai_token') { appendStream(data.token); }
     else if (data.type === 'ai_done') { lastAiReport = data.full; }
@@ -1172,11 +1173,10 @@ function toggleReactMode() {
     btn.style.background = '#27ae60';
     btn.style.color = 'white';
     document.getElementById('aiInput').placeholder = 'Chiedi con tool GIS attivi (ReAct)...';
-    addAiMsg('🧠 <strong>Modalità ReAct attiva.</strong> L\'AI userà i tool GIS per raccogliere dati reali prima di rispondere.', 'ai');
   } else {
     btn.style.background = '#2c3e50';
     btn.style.color = '#95a5a6';
-    document.getElementById('aiInput').placeholder = 'Chiedi all\'assistente VIA...';
+    document.getElementById('aiInput').placeholder = "Chiedi all'assistente VIA...";
   }
 }
 
