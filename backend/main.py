@@ -52,15 +52,21 @@ elif HF_TOKEN:
 else:
     print(f"[LLM] Using Ollama: {OLLAMA_URL} model={OLLAMA_MODEL}")
 
+from datetime import datetime
+
 SYSTEM_PROMPT_TECHNICAL = """Sei VIA Assistant, esperto di Valutazione di Impatto Ambientale per il territorio italiano.
 Interpreta i risultati GIS forniti citando normative applicabili (D.Lgs 152/2006, NTC2018, PAI, Direttive UE).
 Rispondi in italiano, in modo tecnico e professionale.
 Non esprimere giudizi definitivi sull'autorizzabilità — spetta all'autorità competente."""
 
-SYSTEM_PROMPT_CHAT = """Sei VIA Assistant, l'assistente della piattaforma geoVIA.
+def _get_system_prompt_chat():
+    today = datetime.now().strftime("%A %d %B %Y")
+    return f"""Sei VIA Assistant, l'assistente della piattaforma geoVIA.
+Data di oggi: {today}.
 Rispondi in italiano in modo naturale e cordiale.
 Se ti chiedono cose generali, rispondi normalmente.
-Se ti chiedono di VIA/VAS/ambiente, dai risposte tecniche precise."""
+Se ti chiedono di VIA/VAS/ambiente, dai risposte tecniche precise.
+Non inventare mai dati che non conosci — dichiaralo chiaramente."""
 
 @app.on_event("startup")
 async def startup():
@@ -139,7 +145,7 @@ async def http_chat(req: HttpChatRequest):
     """HTTP chat — works on Railway where WebSocket drops"""
     try:
         conversation = req.conversation + [{"role": "user", "content": req.message}]
-        messages = [{"role": "system", "content": SYSTEM_PROMPT_CHAT}] + conversation
+        messages = [{"role": "system", "content": _get_system_prompt_chat()}] + conversation
         if HF_TOKEN:
             url = "https://api-inference.huggingface.co/models/" + HF_MODEL + "/v1/chat/completions"
             headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
@@ -429,7 +435,7 @@ async def ai_chat(ws: WebSocket):
 
             elif data.get("type") == "chat":
                 conversation.append({"role": "user", "content": data["message"]})
-                await _stream_ollama(ws, conversation, model=OLLAMA_MODEL_CHAT, system=SYSTEM_PROMPT_CHAT)
+                await _stream_ollama(ws, conversation, model=OLLAMA_MODEL_CHAT, system=_get_system_prompt_chat())
 
     except WebSocketDisconnect:
         pass
@@ -461,7 +467,7 @@ async def _stream_ollama(ws: WebSocket, conversation: list, model: str = None, s
     if model is None:
         model = OLLAMA_MODEL
     if system is None:
-        system = SYSTEM_PROMPT_CHAT
+        system = _get_system_prompt_chat()
     full = ""
     in_think = False
     try:
