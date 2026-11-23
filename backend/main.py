@@ -38,13 +38,17 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "hermes3:8b")
 OLLAMA_MODEL_CHAT = os.getenv("OLLAMA_MODEL_CHAT", "mistral:latest")
 OPENROUTER_KEY = os.getenv("OPENROUTER_KEY", "")
+HF_TOKEN = os.getenv("HF_TOKEN", "")
+HF_MODEL = os.getenv("HF_MODEL", "mistralai/Mistral-7B-Instruct-v0.3")
 
 # If OpenRouter key is set, use OpenRouter instead of Ollama
 if OPENROUTER_KEY:
     OLLAMA_URL = "https://openrouter.ai/api/v1"
-    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "meta-llama/llama-3.2-3b-instruct:free")
-    OLLAMA_MODEL_CHAT = os.getenv("OLLAMA_MODEL_CHAT", "meta-llama/llama-3.2-3b-instruct:free")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "nvidia/nemotron-3-nano-omni:free")
+    OLLAMA_MODEL_CHAT = OLLAMA_MODEL
     print(f"[LLM] Using OpenRouter: {OLLAMA_MODEL}")
+elif HF_TOKEN:
+    print(f"[LLM] Using HuggingFace: {HF_MODEL}")
 else:
     print(f"[LLM] Using Ollama: {OLLAMA_URL} model={OLLAMA_MODEL}")
 
@@ -136,7 +140,19 @@ async def http_chat(req: HttpChatRequest):
     try:
         conversation = req.conversation + [{"role": "user", "content": req.message}]
         messages = [{"role": "system", "content": SYSTEM_PROMPT_CHAT}] + conversation
-        if OPENROUTER_KEY:
+        if HF_TOKEN:
+            # HuggingFace Inference API
+            url = f"https://router.huggingface.co/novita/v3/openai/chat/completions"
+            headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+            async with httpx.AsyncClient(timeout=60, verify=False) as client:
+                r = await client.post(url, headers=headers,
+                    json={"model": HF_MODEL, "messages": messages, "max_tokens": 1024})
+                if r.status_code == 200:
+                    content = r.json()["choices"][0]["message"]["content"]
+                    return {"response": content,
+                            "conversation": conversation + [{"role": "assistant", "content": content}]}
+                return {"response": f"Errore HF: {r.status_code} {r.text[:200]}", "conversation": conversation}
+        elif OPENROUTER_KEY:
             headers = {"Authorization": f"Bearer {OPENROUTER_KEY}",
                        "HTTP-Referer": "https://geovia.local",
                        "X-Title": "geoVIA", "Content-Type": "application/json"}
