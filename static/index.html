@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>geoVIA — Valutazione Impatto Ambientale</title>
+<link href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" rel="stylesheet"/>
+<script src="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.js"></script>
+<link href="https://unpkg.com/@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css" rel="stylesheet"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #2c3e50; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* HEADER */
+.header { background: #1a252f; color: white; padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.header-logo { font-size: 17px; font-weight: 700; }
+.header-logo span { color: #27ae60; }
+.header-logo small { font-size: 11px; color: #95a5a6; margin-left: 8px; font-weight: normal; }
+.header-right { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #95a5a6; }
+.badge { background: #2c3e50; border: 1px solid #27ae60; color: #27ae60; padding: 3px 8px; border-radius: 10px; font-size: 11px; }
+
+/* MAIN */
+.main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* LEFT SIDEBAR */
+.sidebar { width: 340px; flex-shrink: 0; background: white; border-right: 1px solid #dde1e7; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-tabs { display: flex; border-bottom: 1px solid #dde1e7; flex-shrink: 0; }
+.tab { flex: 1; padding: 10px 4px; text-align: center; font-size: 11px; cursor: pointer; color: #7f8c8d; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tab.active { color: #27ae60; border-bottom-color: #27ae60; font-weight: 600; }
+.tab-content { display: none; flex: 1; overflow-y: auto; padding: 14px; flex-direction: column; gap: 12px; }
+.tab-content.active { display: flex; }
+
+/* FORM ELEMENTS */
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-label { font-size: 11px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.3px; }
+.form-input { padding: 8px 10px; border: 1px solid #dde1e7; border-radius: 6px; font-size: 13px; outline: none; font-family: inherit; }
+.form-input:focus { border-color: #27ae60; }
+.form-select { padding: 8px 10px; border: 1px solid #dde1e7; border-radius: 6px; font-size: 13px; background: white; outline: none; }
+.btn { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+.btn-primary { background: #27ae60; color: white; width: 100%; }
+.btn-primary:hover { background: #219a52; }
+.btn-primary:disabled { background: #95a5a6; cursor: not-allowed; }
+.btn-secondary { background: #2c3e50; color: white; }
+.btn-secondary:hover { background: #3498db; }
+.btn-outline { background: white; color: #2c3e50; border: 1px solid #dde1e7; }
+.btn-outline:hover { border-color: #27ae60; color: #27ae60; }
+
+/* SEARCH */
+.search-wrapper { position: relative; }
+.search-results { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #dde1e7; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 9999; max-height: 180px; overflow-y: auto; }
+.search-item { padding: 8px 12px; cursor: pointer; font-size: 12px; border-bottom: 1px solid #f0f2f5; }
+.search-item:hover { background: #f8f9fa; }
+
+/* BUFFER CONTROLS */
+.buffer-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { padding: 4px 10px; border-radius: 12px; font-size: 11px; cursor: pointer; border: 1px solid #dde1e7; background: white; transition: all 0.2s; }
+.chip.active { background: #27ae60; color: white; border-color: #27ae60; }
+
+/* GAUGE SVG */
+.gauge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.gauge-card { background: #f8f9fa; border-radius: 8px; padding: 8px; text-align: center; }
+.gauge-label { font-size: 10px; color: #7f8c8d; margin-top: 4px; line-height: 1.2; }
+.gauge-score { font-size: 13px; font-weight: 700; }
+
+/* RISK INDICATORS */
+.indicator { background: #f8f9fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.indicator-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.indicator-name { font-size: 12px; font-weight: 600; }
+.indicator-score { font-size: 14px; font-weight: 700; }
+.indicator-bar-bg { background: #e9ecef; border-radius: 4px; height: 6px; }
+.indicator-bar { height: 6px; border-radius: 4px; transition: width 0.8s ease; }
+.indicator-meta { font-size: 10px; color: #95a5a6; margin-top: 4px; }
+.level-badge { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; color: white; }
+
+/* GLOBAL SCORE */
+.global-score-card { background: linear-gradient(135deg, #1a252f, #2c3e50); color: white; border-radius: 10px; padding: 16px; text-align: center; }
+.global-score-num { font-size: 40px; font-weight: 700; line-height: 1; }
+.global-score-label { font-size: 12px; color: #95a5a6; margin-top: 4px; }
+.global-level { font-size: 16px; font-weight: 600; margin-top: 6px; }
+.via-screening { font-size: 11px; margin-top: 10px; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.1); line-height: 1.4; }
+
+/* UPLOAD AREA */
+.upload-area { border: 2px dashed #dde1e7; border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; font-size: 12px; color: #95a5a6; transition: border-color 0.2s; }
+.upload-area:hover { border-color: #27ae60; }
+.upload-area.success { border-color: #27ae60; color: #27ae60; }
+.upload-area.error { border-color: #e74c3c; color: #e74c3c; }
+
+/* PROJECT LIST */
+.project-item { background: #f8f9fa; border-radius: 8px; padding: 10px 12px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+.project-item:hover { border-color: #27ae60; }
+.project-name { font-size: 13px; font-weight: 600; }
+.project-meta { font-size: 11px; color: #95a5a6; margin-top: 2px; }
+
+/* MAP CONTAINER */
+.map-container { flex: 1; position: relative; min-width: 0; }
+#map { width: 100%; height: 100%; }
+
+/* MAP OVERLAY CONTROLS */
+.map-controls { position: absolute; top: 10px; right: 10px; z-index: 100; display: flex; flex-direction: column; gap: 6px; }
+.map-btn { background: white; border: 1px solid #dde1e7; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); white-space: nowrap; }
+.map-btn:hover { background: #f8f9fa; }
+.map-btn.active { background: #27ae60; color: white; border-color: #27ae60; }
+
+/* RIGHT PANEL - AI */
+.ai-panel { width: 360px; flex-shrink: 0; background: white; border-left: 1px solid #dde1e7; display: flex; flex-direction: column; min-height: 0; }
+.ai-header { background: #1a252f; color: white; padding: 12px 16px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ai-status { width: 7px; height: 7px; border-radius: 50%; background: #e74c3c; }
+.ai-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.ai-msg { font-size: 12px; line-height: 1.6; }
+.ai-msg-bubble { padding: 10px 12px; border-radius: 8px; white-space: pre-wrap; }
+.ai-msg-ai .ai-msg-bubble { background: #f8f9fa; border: 1px solid #e9ecef; }
+.ai-msg-user .ai-msg-bubble { background: #1a252f; color: white; }
+.ai-msg-sender { font-size: 10px; color: #95a5a6; margin-bottom: 3px; }
+.ai-input { padding: 10px; border-top: 1px solid #dde1e7; display: flex; gap: 8px; flex-shrink: 0; }
+.ai-input input { flex: 1; padding: 8px 12px; border: 1px solid #dde1e7; border-radius: 16px; font-size: 12px; outline: none; }
+.ai-input input:focus { border-color: #27ae60; }
+.ai-send { background: #1a252f; color: white; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 14px; }
+.ai-send:hover { background: #27ae60; }
+.typing { display: flex; gap: 3px; padding: 6px 10px; }
+.typing span { width: 6px; height: 6px; background: #95a5a6; border-radius: 50%; animation: bounce 1.2s infinite; }
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+
+/* DIVIDER */
+.divider { height: 1px; background: #dde1e7; margin: 4px 0; }
+.section-title { font-size: 11px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+
+/* ── MOBILE ───────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Header: compact */
+  .header { height: 44px; padding: 0 12px; }
+  .header-logo small { display: none; }
+  .header-right span:not(#wsStatus) { display: none; }
+  .badge { display: none; }
+
+  /* Main: stack vertically, map fills screen */
+  .main { flex-direction: column; position: relative; }
+
+  /* Sidebar becomes bottom sheet */
+  .sidebar {
+    position: fixed; bottom: 52px; left: 0; right: 0; z-index: 200;
+    width: 100%; height: 50vh;
+    border-right: none; border-top: 1px solid #dde1e7;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    transform: translateY(calc(100% - 52px));
+    transition: transform 0.3s ease;
+  }
+  .sidebar.open { transform: translateY(0); }
+  .sidebar-tabs {
+    border-radius: 16px 16px 0 0;
+    cursor: pointer;
+    padding-top: 8px;
+  }
+  /* Drag handle */
+  .sidebar-tabs::before {
+    content: '';
+    display: block;
+    width: 36px; height: 4px;
+    background: #dde1e7; border-radius: 2px;
+    margin: 0 auto 8px;
+  }
+  .tab { padding: 8px 4px; font-size: 10px; }
+
+  /* Map fills everything */
+  .map-container { flex: 1; height: calc(100vh - 44px); }
+
+  /* Map controls: bottom-left, touch-friendly */
+  .map-controls {
+    top: auto; right: auto;
+    bottom: calc(50vh + 8px);
+    left: 8px;
+    flex-direction: column;
+  }
+  .map-btn { min-height: 40px; font-size: 13px; padding: 8px 12px; }
+
+  /* AI panel becomes bottom drawer */
+  .ai-panel {
+    position: fixed; bottom: 52px; left: 0; right: 0; z-index: 300;
+    width: 100%; height: 70vh;
+    border-left: none; border-top: 1px solid #dde1e7;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+  .ai-panel.open { transform: translateY(0); }
+  .ai-header { border-radius: 16px 16px 0 0; cursor: pointer; }
+  .ai-header::before {
+    content: '';
+    display: block;
+    width: 36px; height: 4px;
+    background: rgba(255,255,255,0.3); border-radius: 2px;
+    margin: 0 auto 8px;
+  }
+
+  /* Bottom nav bar */
+  .mobile-nav {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 400;
+    background: #1a252f; height: 52px;
+    border-top: 1px solid #2c3e50;
+  }
+  .mobile-nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px;
+    color: #95a5a6; font-size: 9px; cursor: pointer;
+    border: none; background: none; padding: 4px;
+    transition: color 0.2s;
+  }
+  .mobile-nav-btn .nav-icon { font-size: 18px; line-height: 1; }
+  .mobile-nav-btn.active { color: #27ae60; }
+
+  /* Touch-friendly inputs */
+  .form-input, .form-select { font-size: 16px; padding: 10px 12px; }
+  .btn { padding: 12px 16px; font-size: 14px; }
+  .chip { padding: 6px 12px; font-size: 12px; }
+
+  /* Gauge grid: 3 columns on mobile */
+  .gauge-grid { grid-template-columns: 1fr 1fr 1fr; }
+}
+
+/* Desktop: hide mobile nav */
+.mobile-nav { display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <span class="header-logo">🌍 geo<span>VIA</span><small>Valutazione Impatto Ambientale</small></span>
+  </div>
+  <div class="header-right">
+    <span class="badge" id="modelBadge">⚡ hermes3 + mistral</span>
+    <span>ISPRA · INGV · Natura2000 · CORINE · OpenAQ</span>
+    <span id="wsStatus" style="color:#e74c3c">● offline</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="tab active" onclick="switchTab('progetto')">📋 Progetto</div>
+      <div class="tab" onclick="switchTab('risultati')">📊 Risultati</div>
+      <div class="tab" onclick="switchTab('brief')">🎯 Brief</div>
+      <div class="tab" onclick="switchTab('whatif')">🔬 What-if</div>
+      <div class="tab" onclick="switchTab('confronto')">⚖️ Confronto</div>
+      <div class="tab" onclick="switchTab('documenti')">📎 Docs</div>
+      <div class="tab" onclick="switchTab('storico')">🕐 Storico</div>
+    </div>
+
+    <!-- TAB PROGETTO -->
+    <div class="tab-content active" id="tab-progetto">
+      <div class="form-group">
+        <div class="form-label">Nome Progetto</div>
+        <input class="form-input" id="projectName" placeholder="Es. Impianto FV Salerno"/>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Tipo Progetto</div>
+        <select class="form-select" id="projectType">
+          <option value="">-- Seleziona --</option>
+          <option value="residenziale">🏠 Residenziale</option>
+          <option value="industriale">🏭 Industriale</option>
+          <option value="viario">🛣️ Infrastruttura Viaria</option>
+          <option value="agricolo">🌾 Agricolo</option>
+          <option value="turistico">🏨 Turistico/Ricettivo</option>
+          <option value="energetico">⚡ Impianto Energetico</option>
+          <option value="commerciale">🏪 Commerciale</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Cerca Area</div>
+        <div class="search-wrapper">
+          <input class="form-input" id="searchInput" placeholder="Città, indirizzo, coordinate..." autocomplete="off" style="width:100%"/>
+          <div class="search-results" id="searchResults" style="display:none"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Particella Catastale</div>
+        <div style="display:flex;gap:6px">
+          <input class="form-input" id="catComune" placeholder="Comune" style="flex:3"/>
+          <input class="form-input" id="catFoglio" placeholder="Fg." style="flex:2"/>
+          <input class="form-input" id="catParticella" placeholder="Part." style="flex:2"/>
+        </div>
+        <button class="btn btn-outline" onclick="searchCatasto()" style="margin-top:4px">🔍 Cerca Catasto</button>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Buffer di Analisi</div>
+        <div class="buffer-chips">
+          <div class="chip active" data-buf="100" onclick="toggleBuffer(this)">100m</div>
+          <div class="chip active" data-buf="500" onclick="toggleBuffer(this)">500m</div>
+          <div class="chip active" data-buf="1000" onclick="toggleBuffer(this)">1km</div>
+          <div class="chip" data-buf="5000" onclick="toggleBuffer(this)">5km</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Note</div>
+        <textarea class="form-input" id="projectDesc" placeholder="Descrizione progetto..." style="height:60px;resize:none"></textarea>
+      </div>
+      <button class="btn btn-primary" id="btnAnalyze" onclick="runAnalysis()" disabled>
+        🔬 Avvia Analisi Ambientale
+      </button>
+      <div style="font-size:11px;color:#95a5a6;text-align:center">
+        Disegna l'area sulla mappa o cerca per indirizzo
+      </div>
+    </div>
+
+    <!-- TAB RISULTATI -->
+    <div class="tab-content" id="tab-risultati">
+      <div id="resultsEmpty" style="text-align:center;color:#95a5a6;font-size:13px;padding:20px">
+        Nessuna analisi ancora.<br>Vai su Progetto e avvia l'analisi.
+      </div>
+      <div id="resultsContent" style="display:none">
+        <div class="global-score-card" id="globalScoreCard"></div>
+        <div class="gauge-grid" id="gaugeGrid"></div>
+        <div style="margin-top:8px" id="indicatorsList"></div>
+        <div id="vincoliCard" style="display:none;margin-top:8px"></div>
+        <div id="dtmCard" style="display:none;margin-top:8px"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-secondary" style="flex:1" onclick="exportPdf()">📄 PDF</button>
+          <button class="btn btn-outline" style="flex:1" onclick="exportGeoJSON()">🗺️ GeoJSON</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB WHATIF -->
+    <div class="tab-content" id="tab-whatif">
+      <div style="font-size:11px;color:#7f8c8d;margin-bottom:8px">Definisci l'intervento per simulare gli impatti sul territorio.</div>
+      <div class="form-group">
+        <div class="form-label">Superficie Edificata (m²)</div>
+        <input class="form-input" id="wi_building" type="number" placeholder="es. 8000" min="0"/>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Strade e Parcheggi (m²)</div>
+        <input class="form-input" id="wi_road" type="number" placeholder="es. 4000" min="0"/>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Verde Mantenuto/Creato (m²)</div>
+        <input class="form-input" id="wi_green" type="number" placeholder="es. 5000" min="0"/>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Pavimentazione Drenante (m²)</div>
+        <input class="form-input" id="wi_permeable" type="number" placeholder="es. 1000" min="0"/>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Pioggia di Progetto (mm)</div>
+        <div class="buffer-chips">
+          <div class="chip active" data-rain="30" onclick="toggleRain(this)">30mm</div>
+          <div class="chip active" data-rain="50" onclick="toggleRain(this)">50mm</div>
+          <div class="chip" data-rain="100" onclick="toggleRain(this)">100mm</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnWhatif" onclick="runWhatif()" disabled>
+        🔬 Simula Impatti
+      </button>
+      <div id="whatifResult" style="margin-top:12px"></div>
+    </div>
+
+    <!-- TAB BRIEF -->
+    <div class="tab-content" id="tab-brief">
+      <div id="briefEmpty" style="text-align:center;color:#95a5a6;font-size:13px;padding:20px">
+        Avvia un'analisi per generare il Decision Brief.
+      </div>
+      <div id="briefContent" style="display:none;flex-direction:column;gap:12px">
+        <div id="briefSemaforo" style="border-radius:10px;padding:16px;text-align:center"></div>
+        <div id="briefSummary" style="background:#f8f9fa;border-radius:8px;padding:12px;font-size:12px;line-height:1.6"></div>
+        <div>
+          <div class="form-label" style="margin-bottom:6px">Top 3 Rischi</div>
+          <div id="briefRisks"></div>
+        </div>
+        <div>
+          <div class="form-label" style="margin-bottom:6px">Azioni Immediate</div>
+          <div id="briefActions"></div>
+        </div>
+        <div id="briefVia" style="background:#f0f7ff;border-radius:8px;padding:12px;font-size:12px"></div>
+        <div>
+          <div class="form-label" style="margin-bottom:6px">Prescrizioni Probabili</div>
+          <div id="briefPrescriptions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB CONFRONTO -->
+    <div class="tab-content" id="tab-confronto">
+      <div style="font-size:11px;color:#7f8c8d;margin-bottom:8px">Disegna 2-3 aree alternative sulla mappa e confrontale.</div>
+      <div id="scenarioList" style="display:flex;flex-direction:column;gap:6px"></div>
+      <button class="btn btn-outline" style="margin-top:4px" onclick="addScenario()">➕ Aggiungi Scenario</button>
+      <button class="btn btn-primary" style="margin-top:6px" id="btnCompare" onclick="runComparison()" disabled>⚖️ Confronta Scenari</button>
+      <div id="comparisonResult" style="margin-top:12px"></div>
+    </div>
+
+    <!-- TAB DOCUMENTI -->
+    <div class="tab-content" id="tab-documenti">
+      <div class="form-group">
+        <div class="form-label">Carica Documento</div>
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+          📎 PDF, Word, Excel, Immagini<br>
+          <small>Clicca o trascina qui</small>
+        </div>
+        <input type="file" id="fileInput" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" onchange="uploadDoc(this)"/>
+      </div>
+      <div id="docList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <!-- TAB STORICO -->
+    <div class="tab-content" id="tab-storico">
+      <div id="projectList" style="display:flex;flex-direction:column;gap:8px">
+        <div style="text-align:center;color:#95a5a6;font-size:13px">Caricamento...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="map-controls">
+      <button class="map-btn" id="btnDraw" onclick="toggleDraw()">✏️ Disegna Area</button>
+      <button class="map-btn" id="btnCatasto" onclick="toggleCatasto()">🗺️ Layer Catasto</button>
+      <button class="map-btn" onclick="clearMap()">🗑️ Pulisci</button>
+    </div>
+  </div>
+
+  <!-- AI PANEL -->
+  <div class="ai-panel">
+    <div class="ai-header">
+      <div class="ai-status" id="aiStatus"></div>
+      VIA Assistant
+    </div>
+    <div class="ai-messages" id="aiMessages">
+      <div class="ai-msg ai-msg-ai">
+        <div class="ai-msg-sender">VIA Assistant</div>
+        <div class="ai-msg-bubble">Benvenuto in <strong>geoVIA</strong>.<br><br>Questo sistema utilizza un motore GIS deterministico per calcolare i rischi ambientali. L'AI interpreta i risultati ma non li calcola.<br><br>Per iniziare:<br>1. Inserisci il nome del progetto<br>2. Seleziona il tipo<br>3. Disegna l'area sulla mappa<br>4. Avvia l'analisi</div>
+      </div>
+    </div>
+    <div class="ai-input">
+      <button id="btnReactMode" onclick="toggleReactMode()" style="background:#2c3e50;color:#95a5a6;border:none;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:10px;white-space:nowrap" title="Modalità ReAct: l'AI usa i tool GIS">🧠 ReAct</button>
+      <input type="text" id="aiInput" placeholder="Chiedi all'assistente VIA..." onkeydown="if(event.key==='Enter')sendAiChat()"/>
+      <button class="ai-send" onclick="sendAiChat()">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<div class="mobile-nav" id="mobileNav">
+  <button class="mobile-nav-btn active" id="mnMap" onclick="mobileShow('map')">
+    <span class="nav-icon">🗺️</span>Mappa
+  </button>
+  <button class="mobile-nav-btn" id="mnForm" onclick="mobileShow('form')">
+    <span class="nav-icon">📋</span>Progetto
+  </button>
+  <button class="mobile-nav-btn" id="mnResults" onclick="mobileShow('results')">
+    <span class="nav-icon">📊</span>Risultati
+  </button>
+  <button class="mobile-nav-btn" id="mnAi" onclick="mobileShow('ai')">
+    <span class="nav-icon">🤖</span>AI
+  </button>
+</div>
+
+<script>
+// ── MAP INIT ──────────────────────────────────────────────────────────────────
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+  center: [12.5, 41.9],
+  zoom: 5.5
+});
+
+map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+
+let drawnGeojson = null;
+let currentResult = null;
+let lastAiReport = "";
+let ws = null;
+let typingEl = null;
+let cadastreVisible = false;
+let drawMode = false;
+let drawPoints = [];
+let drawMarkers = [];
+let activeBuffers = [100, 500, 1000];
+let docTexts = [];
+
+// ── MAPLIBRE DRAW (manual polygon) ───────────────────────────────────────────
+map.on('load', () => {
+  map.addSource('drawn-area', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'drawn-fill', type: 'fill', source: 'drawn-area', paint: { 'fill-color': '#27ae60', 'fill-opacity': 0.15 } });
+  map.addLayer({ id: 'drawn-line', type: 'line', source: 'drawn-area', paint: { 'line-color': '#27ae60', 'line-width': 2 } });
+
+  map.addSource('buffer-area', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'buffer-fill', type: 'fill', source: 'buffer-area', paint: { 'fill-color': '#3498db', 'fill-opacity': 0.05 } });
+  map.addLayer({ id: 'buffer-line', type: 'line', source: 'buffer-area', paint: { 'line-color': '#3498db', 'line-width': 1, 'line-dasharray': [3, 3] } });
+
+  loadProjects();
+});
+
+map.on('click', (e) => {
+  if (!drawMode) return;
+  const pt = [e.lngLat.lng, e.lngLat.lat];
+  drawPoints.push(pt);
+  const m = new maplibregl.Marker({ color: '#27ae60', scale: 0.6 }).setLngLat(pt).addTo(map);
+  drawMarkers.push(m);
+  if (drawPoints.length >= 3) {
+    const polygon = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...drawPoints, drawPoints[0]]] } };
+    map.getSource('drawn-area').setData({ type: 'FeatureCollection', features: [polygon] });
+    drawnGeojson = polygon;
+    document.getElementById('btnAnalyze').disabled = false;
+  }
+});
+
+map.on('dblclick', (e) => {
+  if (!drawMode) return;
+  e.preventDefault();
+  toggleDraw();
+});
+
+function toggleDraw() {
+  drawMode = !drawMode;
+  const btn = document.getElementById('btnDraw');
+  if (drawMode) {
+    btn.classList.add('active');
+    btn.textContent = '✅ Fine Disegno (dbl-click)';
+    map.getCanvas().style.cursor = 'crosshair';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '✏️ Disegna Area';
+    map.getCanvas().style.cursor = '';
+  }
+}
+
+function clearMap() {
+  drawPoints = [];
+  drawMarkers.forEach(m => m.remove());
+  drawMarkers = [];
+  drawnGeojson = null;
+  map.getSource('drawn-area').setData({ type: 'FeatureCollection', features: [] });
+  map.getSource('buffer-area').setData({ type: 'FeatureCollection', features: [] });
+  document.getElementById('btnAnalyze').disabled = true;
+  if (drawMode) toggleDraw();
+}
+
+function toggleCatasto() {
+  cadastreVisible = !cadastreVisible;
+  const btn = document.getElementById('btnCatasto');
+  if (cadastreVisible) {
+    if (!map.getSource('catasto-wms')) {
+      map.addSource('catasto-wms', {
+        type: 'raster',
+        tiles: [
+          `${location.origin}/api/wms/catasto?bbox={bbox-epsg-3857}&width=512&height=512`
+        ],
+        tileSize: 512,
+        minzoom: 18,
+        attribution: '© Agenzia delle Entrate'
+      });
+      map.addLayer({
+        id: 'catasto-layer',
+        type: 'raster',
+        source: 'catasto-wms',
+        minzoom: 18,
+        paint: { 'raster-opacity': 0.85 }
+      });
+    } else {
+      map.setLayoutProperty('catasto-layer', 'visibility', 'visible');
+    }
+    btn.classList.add('active');
+    if (map.getZoom() < 19) {
+      map.easeTo({ zoom: 19, duration: 800 });
+      addAiMsg('🗺️ Layer catasto attivato — zoom a 19 per vedere i numeri delle particelle.', 'ai');
+    }
+  } else {
+    if (map.getLayer('catasto-layer'))
+      map.setLayoutProperty('catasto-layer', 'visibility', 'none');
+    btn.classList.remove('active');
+  }
+}
+
+function toggleBuffer(el) {
+  const val = parseInt(el.dataset.buf);
+  el.classList.toggle('active');
+  if (el.classList.contains('active')) {
+    if (!activeBuffers.includes(val)) activeBuffers.push(val);
+  } else {
+    activeBuffers = activeBuffers.filter(b => b !== val);
+  }
+}
+
+// ── GEOCODING ─────────────────────────────────────────────────────────────────
+let searchTimer;
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  const q = this.value.trim();
+  if (q.length < 3) { document.getElementById('searchResults').style.display = 'none'; return; }
+  searchTimer = setTimeout(async () => {
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+    const results = await res.json();
+    const list = document.getElementById('searchResults');
+    if (!results.length) { list.style.display = 'none'; return; }
+    list.innerHTML = results.slice(0,5).map(r => {
+      const name = r.display_name.split(',').slice(0,3).join(',');
+      return `<div class="search-item" onclick="flyToLocation(${r.lat},${r.lon},'${name.replace(/'/g,"\\'")}')">📍 ${name}</div>`;
+    }).join('');
+    list.style.display = 'block';
+  }, 300);
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrapper')) document.getElementById('searchResults').style.display = 'none';
+});
+
+function flyToLocation(lat, lon, name) {
+  document.getElementById('searchInput').value = name;
+  document.getElementById('searchResults').style.display = 'none';
+  map.flyTo({ center: [parseFloat(lon), parseFloat(lat)], zoom: 13, duration: 1500 });
+  new maplibregl.Marker({ color: '#e74c3c' }).setLngLat([parseFloat(lon), parseFloat(lat)]).addTo(map);
+}
+
+async function searchCatasto() {
+  const comune = document.getElementById('catComune').value.trim();
+  if (!comune) { alert('Inserisci il Comune'); return; }
+  const res = await fetch(`/api/geocode?q=${encodeURIComponent(comune + ', Italia')}`);
+  const results = await res.json();
+  if (!results.length) { alert('Comune non trovato'); return; }
+  const g = results[0];
+  map.flyTo({ center: [parseFloat(g.lon), parseFloat(g.lat)], zoom: 14 });
+  if (!cadastreVisible) toggleCatasto();
+}
+
+// ── ANALYSIS ──────────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!drawnGeojson) { alert('Disegna prima un\'area sulla mappa'); return; }
+  const btn = document.getElementById('btnAnalyze');
+  btn.textContent = '⏳ Analisi in corso...';
+  btn.disabled = true;
+
+  addAiMsg('🔬 Avvio analisi GIS deterministico...', 'ai');
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        geojson: drawnGeojson,
+        project_type: document.getElementById('projectType').value,
+        project_name: document.getElementById('projectName').value || 'Progetto senza nome',
+        description: document.getElementById('projectDesc').value,
+        buffers: activeBuffers,
+        doc_text: docTexts.map(d => d.text).join('\n\n---\n\n')
+      })
+    });
+
+    currentResult = await res.json();
+    if (currentResult.error) throw new Error(currentResult.error);
+
+    // Show buffers on map
+    const bufferFeatures = Object.values(currentResult.buffers || {}).map(geom => ({
+      type: 'Feature', geometry: geom
+    }));
+    map.getSource('buffer-area').setData({ type: 'FeatureCollection', features: bufferFeatures });
+
+    // Show GIS results immediately
+    renderResults(currentResult);
+    renderBrief(currentResult);
+    switchTab('risultati');
+
+    // Run enrichment in parallel (no LLM)
+    enrichAnalysis(currentResult.lat, currentResult.lon, currentResult.project_type, currentResult.area_m2);
+
+    // Call LLM interpretation separately — Ollama is now free from API timeouts
+    interpretResults(currentResult);
+
+  } catch(e) {
+    addAiMsg(`❌ Errore: ${e.message}`, 'ai');
+  } finally {
+    btn.textContent = '🔬 Avvia Analisi Ambientale';
+    btn.disabled = false;
+  }
+}
+
+function _renderResultsCore(result) {
+  if (!result || !result.indicators) return;
+  document.getElementById('resultsEmpty').style.display = 'none';
+  document.getElementById('resultsContent').style.display = 'block';
+
+  const lc = { 'MOLTO ALTO':'#c0392b','ALTO':'#e67e22','MEDIO':'#f39c12','BASSO':'#27ae60','TRASCURABILE':'#2ecc71' };
+  const gc = lc[result.global_level] || '#f39c12';
+
+  document.getElementById('globalScoreCard').innerHTML = `
+    <div class="global-score-num">${result.global_score}</div>
+    <div class="global-score-label">/100 — Rischio Complessivo</div>
+    <div class="global-level" style="color:${gc}">${result.global_level}</div>
+    <div class="via-screening">${result.via_screening}</div>`;
+
+  // Gauge SVG grid
+  document.getElementById('gaugeGrid').innerHTML = result.indicators.map(i => {
+    const c = lc[i.level] || '#f39c12';
+    const r = 28, cx = 36, cy = 36;
+    const circ = 2 * Math.PI * r;
+    const dash = (i.score / 100) * circ;
+    const shortName = i.name.replace('Rischio ', '').replace('Impatto ', '').replace("dell'Aria", 'Aria');
+    return `<div class="gauge-card">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e9ecef" stroke-width="7"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-width="7"
+          stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}"
+          stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
+        <text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle"
+          font-size="13" font-weight="700" fill="${c}">${i.score}</text>
+      </svg>
+      <div class="gauge-label">${shortName}</div>
+    </div>`;
+  }).join('');
+
+  // Indicator bars (compact)
+  const list = document.getElementById('indicatorsList');
+  list.innerHTML = result.indicators.map(i => {
+    const c = lc[i.level] || '#f39c12';
+    return `<div class="indicator">
+      <div class="indicator-header">
+        <span class="indicator-name">${i.name}</span>
+        <span class="level-badge" style="background:${c}">${i.level}</span>
+      </div>
+      <div class="indicator-bar-bg"><div class="indicator-bar" style="width:${i.score}%;background:${c}"></div></div>
+      <div class="indicator-meta">${i.notes}</div>
+    </div>`;
+  }).join('');
+
+  // Color the drawn area on map by risk level
+  colorMapByRisk(result.global_level, lc);
+
+  // DTM card
+  const dtm = result.dtm;
+  if (dtm && dtm.elev_mean_m !== undefined) {
+    document.getElementById('dtmCard').style.display = 'block';
+    document.getElementById('dtmCard').innerHTML =
+      `<div style="background:#f0f7ff;border-radius:8px;padding:10px 12px;font-size:11px">
+        <div style="font-weight:600;margin-bottom:4px">🗻 Morfologia (${dtm.source})</div>
+        Quota media: <strong>${dtm.elev_mean_m}m</strong> (${dtm.elev_min_m}-${dtm.elev_max_m}m) |
+        Pendenza: <strong>${dtm.slope_mean_deg}°</strong> — <strong>${dtm.slope_class}</strong>
+      </div>`;
+  }
+
+  // Vincoli card
+  const v = result.vincoli;
+  if (v && v.count > 0) {
+    const blocchi = v.blocchi_procedurali || [];
+    document.getElementById('vincoliCard').style.display = 'block';
+    document.getElementById('vincoliCard').innerHTML =
+      `<div style="background:#fff3cd;border:1px solid #f39c12;border-radius:8px;padding:10px 12px;font-size:11px">
+        <div style="font-weight:600;margin-bottom:6px">⚠️ Vincoli Territoriali (${v.count} rilevati)</div>
+        ${blocchi.map(b => `<div style="margin-bottom:4px;padding:4px 8px;background:${b.impatto.includes('BLOCCANTE') ? '#fde8e8' : '#fff8e1'};border-radius:4px">
+          <strong style="color:${b.impatto.includes('BLOCCANTE') ? '#c0392b' : '#e67e22'}">${b.tipo}</strong><br>
+          ${b.descrizione}<br>
+          <span style="color:#95a5a6">${b.norma}</span>
+        </div>`).join('')}
+        ${v.vincoli_paesaggistici?.length ? `<div style="color:#7f8c8d;margin-top:4px">${v.vincoli_paesaggistici.length} vincoli paesaggistici | ${v.aree_protette?.length || 0} aree protette</div>` : ''}
+      </div>`;
+  }
+}
+
+// ── WEBSOCKET AI ──────────────────────────────────────────────────────────────
+// ── MOBILE NAV ─────────────────────────────────────────────────────────────────────────────────
+const isMobile = () => window.innerWidth <= 768;
+
+function mobileShow(panel) {
+  if (!isMobile()) return;
+  const sidebar = document.querySelector('.sidebar');
+  const aiPanel = document.querySelector('.ai-panel');
+  // reset all
+  sidebar.classList.remove('open');
+  aiPanel.classList.remove('open');
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+
+  if (panel === 'map') {
+    document.getElementById('mnMap').classList.add('active');
+  } else if (panel === 'form') {
+    sidebar.classList.add('open');
+    switchTab('progetto');
+    document.getElementById('mnForm').classList.add('active');
+  } else if (panel === 'results') {
+    sidebar.classList.add('open');
+    switchTab('risultati');
+    document.getElementById('mnResults').classList.add('active');
+  } else if (panel === 'ai') {
+    aiPanel.classList.add('open');
+    document.getElementById('mnAi').classList.add('active');
+  }
+}
+
+// Tap on sidebar drag handle toggles it
+document.querySelector('.sidebar-tabs').addEventListener('click', (e) => {
+  if (!isMobile()) return;
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar.classList.contains('open')) {
+    sidebar.classList.add('open');
+  }
+});
+
+// Tap on AI header toggles drawer
+document.querySelector('.ai-header').addEventListener('click', () => {
+  if (!isMobile()) return;
+  const aiPanel = document.querySelector('.ai-panel');
+  aiPanel.classList.toggle('open');
+  if (!aiPanel.classList.contains('open')) {
+    document.getElementById('mnAi').classList.remove('active');
+    document.getElementById('mnMap').classList.add('active');
+  }
+});
+
+// After analysis on mobile: auto-open results
+function renderResults(result) {
+  _renderResultsCore(result);
+  if (isMobile()) mobileShow('results');
+}
+
+// ── WHAT-IF ─────────────────────────────────────────────────────────────────────────────────
+let selectedRain = 50;
+
+function toggleRain(el) {
+  document.querySelectorAll('[data-rain]').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  selectedRain = parseInt(el.dataset.rain);
+}
+
+// Enable whatif button when area is drawn
+const _origToggleDraw = toggleDraw;
+toggleDraw = function() {
+  _origToggleDraw();
+  document.getElementById('btnWhatif').disabled = !drawnGeojson;
+};
+
+map.on('click', () => {
+  setTimeout(() => {
+    if (drawnGeojson) document.getElementById('btnWhatif').disabled = false;
+  }, 100);
+});
+
+async function runWhatif() {
+  if (!drawnGeojson) { alert('Disegna prima un area sulla mappa'); return; }
+  const btn = document.getElementById('btnWhatif');
+  btn.textContent = '⏳ Calcolo...';
+  btn.disabled = true;
+
+  const intervention = {
+    building_m2: parseFloat(document.getElementById('wi_building').value) || 0,
+    road_m2: parseFloat(document.getElementById('wi_road').value) || 0,
+    green_m2: parseFloat(document.getElementById('wi_green').value) || 0,
+    permeable_m2: parseFloat(document.getElementById('wi_permeable').value) || 0,
+  };
+
+  try {
+    const res = await fetch('/api/whatif', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        geojson: drawnGeojson,
+        intervention,
+        project_type: document.getElementById('projectType').value,
+        rainfall_mm: selectedRain
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderWhatif(data);
+    renderWhatifOnMap(data);
+    addAiMsg(`🔬 **What-if completato:**\nImpatto globale: ${data.impact_level} (${data.impact_score}/100)\n${data.impacts.filter(i=>i.level!=='TRASCURABILE').map(i=>`${i.emoji} ${i.name}: ${i.delta > 0 ? '+' : ''}${i.delta} ${i.unit}`).join('\n')}`, 'ai');
+  } catch(e) {
+    addAiMsg(`❌ Errore what-if: ${e.message}`, 'ai');
+  } finally {
+    btn.textContent = '🔬 Simula Impatti';
+    btn.disabled = false;
+  }
+}
+
+function renderWhatif(data) {
+  const lc = {'CRITICO':'#c0392b','ALTO':'#e67e22','MEDIO':'#f39c12','BASSO':'#27ae60','TRASCURABILE':'#2ecc71'};
+  const el = document.getElementById('whatifResult');
+
+  const impactColor = lc[data.impact_level] || '#f39c12';
+  const rows = data.impacts.map(i => {
+    const c = lc[i.level] || '#f39c12';
+    const deltaStr = i.delta > 0 ? `+${i.delta}` : `${i.delta}`;
+    const pctStr = i.delta_pct !== null ? ` (${i.delta_pct > 0 ? '+' : ''}${i.delta_pct}%)` : '';
+    return `<tr>
+      <td style="padding:6px 8px;font-size:11px">${i.emoji} ${i.name}</td>
+      <td style="padding:6px 8px;font-size:11px;color:#7f8c8d">${i.s0}</td>
+      <td style="padding:6px 8px;font-size:11px">${i.s1}</td>
+      <td style="padding:6px 8px;font-weight:700;color:${c};font-size:11px">${deltaStr}${pctStr}</td>
+    </tr>
+    <tr><td colspan="4" style="padding:2px 8px 6px;font-size:10px;color:#95a5a6;border-bottom:1px solid #f0f2f5">${i.note}</td></tr>`;
+  }).join('');
+
+  const mitRows = data.mitigations.map(m => {
+    const pc = m.priority === 'ALTA' ? '#e74c3c' : '#f39c12';
+    return `<div style="border-left:3px solid ${pc};padding:8px 10px;margin-bottom:6px;background:#f8f9fa;border-radius:0 6px 6px 0;font-size:11px">
+      <strong>${m.measure}</strong><br>
+      → ${m.effect}<br>
+      <span style="color:#95a5a6">${m.norm}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="background:${impactColor}20;border:2px solid ${impactColor};border-radius:8px;padding:10px;text-align:center;margin-bottom:10px">
+      <div style="font-size:20px;font-weight:700;color:${impactColor}">${data.impact_level}</div>
+      <div style="font-size:11px;color:#7f8c8d">Impatto globale ${data.impact_score}/100 | Pioggia ${data.rainfall_mm}mm</div>
+    </div>
+    <div style="font-size:11px;font-weight:600;color:#7f8c8d;margin-bottom:4px">STATO ATTUALE → POST-INTERVENTO</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="background:#f8f9fa"><th style="padding:6px 8px;font-size:10px;text-align:left">Indicatore</th><th style="font-size:10px">S0</th><th style="font-size:10px">S1</th><th style="font-size:10px">Δ</th></tr>
+      ${rows}
+    </table>
+    ${data.mitigations.length ? `<div style="font-size:11px;font-weight:600;color:#7f8c8d;margin:10px 0 4px">MISURE DI MITIGAZIONE</div>${mitRows}` : ''}`;
+}
+
+function renderWhatifOnMap(data) {
+  // Color the drawn polygon by impact level
+  const lc = {'CRITICO':'#c0392b','ALTO':'#e67e22','MEDIO':'#f39c12','BASSO':'#27ae60','TRASCURABILE':'#2ecc71'};
+  const color = lc[data.impact_level] || '#f39c12';
+  const opacity = {'CRITICO':0.45,'ALTO':0.35,'MEDIO':0.25,'BASSO':0.15,'TRASCURABILE':0.1}[data.impact_level] || 0.2;
+  if (map.getLayer('drawn-fill')) {
+    map.setPaintProperty('drawn-fill', 'fill-color', color);
+    map.setPaintProperty('drawn-fill', 'fill-opacity', opacity);
+    map.setPaintProperty('drawn-line', 'line-color', color);
+    map.setPaintProperty('drawn-line', 'line-width', 3);
+  }
+}
+
+// ── DECISION BRIEF ───────────────────────────────────────────────────────────────────────────────
+function renderBrief(result) {
+  const b = result.decision_brief;
+  const p = result.prescriptions;
+  if (!b || !b.semaforo) return;  // empty brief from /api/analyze, filled later by /api/interpret
+
+  document.getElementById('briefEmpty').style.display = 'none';
+  const bc = document.getElementById('briefContent');
+  bc.style.display = 'flex';
+
+  const lc = {'MOLTO ALTO':'#c0392b','ALTO':'#e67e22','MEDIO':'#f39c12','BASSO':'#27ae60','TRASCURABILE':'#2ecc71'};
+  const bgc = lc[b.global_level] || '#f39c12';
+
+  document.getElementById('briefSemaforo').style.background = bgc + '20';
+  document.getElementById('briefSemaforo').style.border = `2px solid ${bgc}`;
+  document.getElementById('briefSemaforo').innerHTML =
+    `<div style="font-size:32px">${b.semaforo}</div>
+     <div style="font-size:16px;font-weight:700;color:${bgc};margin-top:4px">${b.verdict}</div>
+     <div style="font-size:11px;color:#7f8c8d;margin-top:4px">${b.verdict_desc}</div>
+     <div style="font-size:22px;font-weight:700;margin-top:8px">${b.global_score}/100</div>`;
+
+  document.getElementById('briefSummary').textContent = b.exec_summary;
+
+  document.getElementById('briefRisks').innerHTML = b.top_risks.map(r => {
+    const c = lc[r.level] || '#f39c12';
+    return `<div style="background:#f8f9fa;border-left:3px solid ${c};padding:8px 10px;margin-bottom:6px;border-radius:0 6px 6px 0;font-size:12px">
+      <strong style="color:${c}">${r.score}/100</strong> ${r.name}<br>
+      <span style="font-size:10px;color:#95a5a6">${r.notes}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('briefActions').innerHTML = b.immediate_actions.map(a =>
+    `<div style="background:#fff3cd;border-radius:6px;padding:8px 10px;margin-bottom:4px;font-size:12px">⚠️ ${a}</div>`
+  ).join('') || '<div style="font-size:12px;color:#95a5a6">Nessuna azione critica immediata</div>';
+
+  const v = b.via_estimate;
+  document.getElementById('briefVia').innerHTML =
+    `<strong>📅 Stima Procedura VIA</strong><br>
+     Durata stimata: <strong>${v.months_estimate} mesi</strong> | Complessità: ${v.complexity}<br>
+     Costo indicativo: ~€${v.cost_estimate_eur.toLocaleString()}<br>
+     <span style="font-size:10px;color:#95a5a6">${v.note}</span>`;
+
+  if (p && p.prescriptions) {
+    const highP = p.prescriptions.filter(x => x.probability === 'ALTA');
+    const medP = p.prescriptions.filter(x => x.probability === 'MEDIA');
+    document.getElementById('briefPrescriptions').innerHTML =
+      [...highP, ...medP].map(pr => {
+        const col = pr.probability === 'ALTA' ? '#e74c3c' : '#f39c12';
+        return `<div style="border-left:3px solid ${col};padding:6px 10px;margin-bottom:4px;font-size:11px;background:#f8f9fa;border-radius:0 4px 4px 0">
+          <span style="color:${col};font-weight:700;font-size:10px">${pr.probability}</span> ${pr.text}<br>
+          <span style="color:#95a5a6;font-size:10px">${pr.source}</span>
+        </div>`;
+      }).join('');
+  }
+}
+
+// ── SCENARIO COMPARISON ─────────────────────────────────────────────────────────────────────────
+let scenarios = [];
+const SCENARIO_COLORS = ['#e74c3c','#3498db','#9b59b6'];
+
+function addScenario() {
+  if (scenarios.length >= 3) { alert('Massimo 3 scenari'); return; }
+  if (!drawnGeojson) { alert('Disegna prima un area sulla mappa'); return; }
+  const label = String.fromCharCode(65 + scenarios.length); // A, B, C
+  scenarios.push({ label, geojson: JSON.parse(JSON.stringify(drawnGeojson)) });
+
+  // Show on map with scenario color
+  const color = SCENARIO_COLORS[scenarios.length - 1];
+  const srcId = `scenario-${label}`;
+  if (!map.getSource(srcId)) {
+    map.addSource(srcId, { type: 'geojson', data: { type: 'FeatureCollection', features: [drawnGeojson] } });
+    map.addLayer({ id: `${srcId}-fill`, type: 'fill', source: srcId, paint: { 'fill-color': color, 'fill-opacity': 0.2 } });
+    map.addLayer({ id: `${srcId}-line`, type: 'line', source: srcId, paint: { 'line-color': color, 'line-width': 2 } });
+  }
+
+  renderScenarioList();
+  if (scenarios.length >= 2) document.getElementById('btnCompare').disabled = false;
+  addAiMsg(`📍 Scenario ${label} aggiunto. ${scenarios.length < 3 ? 'Disegna un\'altra area per aggiungere uno scenario.' : 'Pronto per il confronto.'}`, 'ai');
+}
+
+function renderScenarioList() {
+  document.getElementById('scenarioList').innerHTML = scenarios.map((s, i) => {
+    const color = SCENARIO_COLORS[i];
+    return `<div style="background:#f8f9fa;border-left:4px solid ${color};padding:8px 10px;border-radius:0 6px 6px 0;font-size:12px;display:flex;justify-content:space-between;align-items:center">
+      <span><strong style="color:${color}">Scenario ${s.label}</strong> — area disegnata</span>
+      <span style="cursor:pointer;color:#e74c3c" onclick="removeScenario(${i})">✕</span>
+    </div>`;
+  }).join('');
+}
+
+function removeScenario(i) {
+  const label = scenarios[i].label;
+  scenarios.splice(i, 1);
+  const srcId = `scenario-${label}`;
+  if (map.getLayer(`${srcId}-fill`)) map.removeLayer(`${srcId}-fill`);
+  if (map.getLayer(`${srcId}-line`)) map.removeLayer(`${srcId}-line`);
+  if (map.getSource(srcId)) map.removeSource(srcId);
+  renderScenarioList();
+  document.getElementById('btnCompare').disabled = scenarios.length < 2;
+}
+
+async function runComparison() {
+  if (scenarios.length < 2) return;
+  const btn = document.getElementById('btnCompare');
+  btn.textContent = '⏳ Analisi...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/compare', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        scenarios: scenarios.map(s => ({label: s.label, geojson: s.geojson})),
+        project_type: document.getElementById('projectType').value
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderComparison(data);
+    addAiMsg(`⚖️ **Confronto completato:**\n${data.recommendation}`, 'ai');
+  } catch(e) {
+    addAiMsg(`❌ Errore confronto: ${e.message}`, 'ai');
+  } finally {
+    btn.textContent = '⚖️ Confronta Scenari';
+    btn.disabled = false;
+  }
+}
+
+function renderComparison(data) {
+  const lc = {'MOLTO ALTO':'#c0392b','ALTO':'#e67e22','MEDIO':'#f39c12','BASSO':'#27ae60','TRASCURABILE':'#2ecc71'};
+  const el = document.getElementById('comparisonResult');
+
+  const rows = data.ranked.map(s => {
+    const c = lc[s.global_level] || '#f39c12';
+    const medal = s.rank === 1 ? '🥇' : s.rank === 2 ? '🥈' : '🥉';
+    const delta = s.rank > 1 ? `<span style="color:#e74c3c">+${s.delta_vs_best}</span>` : '<span style="color:#27ae60">★ migliore</span>';
+    return `<tr>
+      <td style="padding:8px">${medal} <strong>${s.label}</strong></td>
+      <td style="padding:8px;font-weight:700;color:${c}">${s.global_score}/100</td>
+      <td style="padding:8px"><span style="background:${c};color:white;padding:2px 6px;border-radius:8px;font-size:10px">${s.global_level}</span></td>
+      <td style="padding:8px;font-size:11px">${delta}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="background:#e8f5e9;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:8px">
+      🎯 ${data.recommendation}
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <tr style="background:#f8f9fa"><th style="padding:8px;text-align:left">Scenario</th><th>Score</th><th>Livello</th><th>Delta</th></tr>
+      ${rows}
+    </table>`;
+}
+
+function connectWS() {
+  ws = new WebSocket(`ws://${location.host}/ws/ai`);
+  ws.onopen = () => {
+    document.getElementById('aiStatus').style.background = '#2ecc71';
+    document.getElementById('wsStatus').textContent = '● online';
+    document.getElementById('wsStatus').style.color = '#2ecc71';
+    document.getElementById('btnAnalyze').disabled = !drawnGeojson;
+  };
+  ws.onclose = (e) => {
+    document.getElementById('aiStatus').style.background = '#e74c3c';
+    document.getElementById('wsStatus').textContent = '● offline';
+    document.getElementById('wsStatus').style.color = '#e74c3c';
+    console.log('[WS] closed, code:', e.code, 'reason:', e.reason);
+    setTimeout(connectWS, 2000);
+  };
+  ws.onerror = (e) => console.error('[WS] error:', e);
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'ai_start') { removeTyping(); addStreamMsg(); }
+    else if (data.type === 'ai_token') { appendStream(data.token); }
+    else if (data.type === 'ai_done') { lastAiReport = data.full; }
+    else if (data.type === 'react_start') { removeTyping(); addStreamMsg(); }
+    else if (data.type === 'react_token') { appendStream(data.token); }
+    else if (data.type === 'react_done') {
+      lastAiReport = data.full;
+      if (data.tool_calls?.length) {
+        const sources = data.sources?.join(', ') || '';
+        const tools = data.tool_calls.map(t => `${t.tool}(${t.real ? '✅' : '⚠️ stima'})`).join(', ');
+        addAiMsg(`<small style="color:#95a5a6">🔧 Tool usati: ${tools}<br>📚 Fonti: ${sources}<br>🔄 Iterazioni: ${data.iterations}</small>`, 'ai');
+      }
+    }
+    else if (data.type === 'react_error') { addAiMsg(`❌ ReAct error: ${data.error}`, 'ai'); }
+  };
+}
+connectWS();
+
+function addAiMsg(text, role) {
+  const msgs = document.getElementById('aiMessages');
+  const div = document.createElement('div');
+  div.className = `ai-msg ai-msg-${role}`;
+  div.innerHTML = `<div class="ai-msg-sender">${role === 'ai' ? 'VIA Assistant' : 'Tu'}</div><div class="ai-msg-bubble">${text}</div>`;
+  msgs.appendChild(div);
+  // Keep loading indicator always last if present
+  const ind = document.getElementById('ai-loading-indicator');
+  if (ind) { msgs.appendChild(ind); }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addStreamMsg() {
+  removeTyping();
+  const msgs = document.getElementById('aiMessages');
+  // remove previous stream msg id to avoid conflicts
+  const old = document.getElementById('stream-msg');
+  if (old) old.removeAttribute('id');
+  const div = document.createElement('div');
+  div.className = 'ai-msg ai-msg-ai'; div.id = 'stream-msg';
+  div.innerHTML = `<div class="ai-msg-sender">VIA Assistant</div><div class="ai-msg-bubble" id="stream-bubble"></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function appendStream(token) {
+  const msg = document.getElementById('stream-msg');
+  if (!msg) return;
+  const b = msg.querySelector('.ai-msg-bubble');
+  if (b) { b.textContent += token; document.getElementById('aiMessages').scrollTop = 99999; }
+}
+
+function addTyping() {
+  const msgs = document.getElementById('aiMessages');
+  typingEl = document.createElement('div');
+  typingEl.className = 'ai-msg ai-msg-ai';
+  typingEl.innerHTML = `<div class="ai-msg-sender">VIA Assistant</div><div class="ai-msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(typingEl);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() {
+  if (typingEl) { typingEl.remove(); typingEl = null; }
+  const old = document.getElementById('stream-msg');
+  if (old) old.id = '';
+}
+
+let reactMode = false;
+
+function toggleReactMode() {
+  reactMode = !reactMode;
+  const btn = document.getElementById('btnReactMode');
+  if (reactMode) {
+    btn.style.background = '#27ae60';
+    btn.style.color = 'white';
+    document.getElementById('aiInput').placeholder = 'Chiedi con tool GIS attivi (ReAct)...';
+    addAiMsg('🧠 <strong>Modalità ReAct attiva.</strong> L\'AI userà i tool GIS per raccogliere dati reali prima di rispondere.', 'ai');
+  } else {
+    btn.style.background = '#2c3e50';
+    btn.style.color = '#95a5a6';
+    document.getElementById('aiInput').placeholder = 'Chiedi all\'assistente VIA...';
+  }
+}
+
+function sendAiChat() {
+  const input = document.getElementById('aiInput');
+  const msg = input.value.trim();
+  if (!msg || !ws || ws.readyState !== WebSocket.OPEN) return;
+  input.value = '';
+  addAiMsg(msg, 'user');
+
+  if (reactMode) {
+    // ReAct mode: send with context and tool calling
+    addTyping();
+    const context = currentResult ? {
+      geojson: drawnGeojson ? JSON.stringify(drawnGeojson) : null,
+      project_type: currentResult.project_type || document.getElementById('projectType').value,
+      project_name: currentResult.project_name || document.getElementById('projectName').value,
+      lat: currentResult.lat, lon: currentResult.lon,
+      area_m2: currentResult.area_m2
+    } : {
+      geojson: drawnGeojson ? JSON.stringify(drawnGeojson) : null,
+      project_type: document.getElementById('projectType').value,
+      project_name: document.getElementById('projectName').value,
+    };
+    ws.send(JSON.stringify({ type: 'react', message: msg, context }));
+  } else {
+    addTyping();
+    ws.send(JSON.stringify({ type: 'chat', message: msg }));
+  }
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  const names = ['progetto','risultati','brief','whatif','confronto','documenti','storico'];
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'storico') loadProjects();
+}
+
+// ── PROJECTS ──────────────────────────────────────────────────────────────────
+async function loadProjects() {
+  const res = await fetch('/api/projects');
+  const projects = await res.json();
+  const list = document.getElementById('projectList');
+  if (!projects.length) {
+    list.innerHTML = '<div style="text-align:center;color:#95a5a6;font-size:13px">Nessun progetto salvato</div>';
+    return;
+  }
+  list.innerHTML = projects.map(p => `
+    <div class="project-item" onclick="loadProject(${p.id})">
+      <div class="project-name">${p.name}</div>
+      <div class="project-meta">${p.type || 'N/D'} · ${(p.area_m2/10000).toFixed(2)} ha · ${p.created_at?.split('T')[0]}</div>
+    </div>`).join('');
+}
+
+async function loadProject(pid) {
+  const res = await fetch(`/api/projects/${pid}`);
+  const p = await res.json();
+  document.getElementById('projectName').value = p.name;
+  document.getElementById('projectType').value = p.type || '';
+  if (p.geojson) {
+    drawnGeojson = p.geojson;
+    map.getSource('drawn-area').setData({ type: 'FeatureCollection', features: [p.geojson] });
+    const coords = p.geojson.geometry?.coordinates?.[0];
+    if (coords) {
+      const lngs = coords.map(c => c[0]), lats = coords.map(c => c[1]);
+      map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 40 });
+    }
+    document.getElementById('btnAnalyze').disabled = false;
+  }
+  switchTab('progetto');
+}
+
+// ── DOCUMENTS ─────────────────────────────────────────────────────────────────
+async function uploadDoc(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const area = document.getElementById('uploadArea');
+  area.textContent = `⏳ ${file.name}...`;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    docTexts.push({ name: data.filename, text: data.text });
+    area.innerHTML = '📎 PDF, Word, Excel, Immagini<br><small>Clicca o trascina qui</small>';
+    area.classList.add('success');
+    const docList = document.getElementById('docList');
+    const item = document.createElement('div');
+    item.style.cssText = 'background:#f8f9fa;border-radius:6px;padding:8px 10px;font-size:12px';
+    item.innerHTML = `✅ <strong>${data.filename}</strong><br><span style="color:#95a5a6">${data.chars} caratteri estratti</span>`;
+    docList.appendChild(item);
+    addAiMsg(`📎 Documento caricato: ${data.filename}. Puoi chiedermi di analizzarlo.`, 'ai');
+  } catch(e) {
+    area.textContent = `❌ Errore: ${e.message}`;
+    area.classList.add('error');
+  }
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+async function exportPdf() {
+  if (!currentResult) return;
+  const btn = event.target;
+  btn.textContent = '⏳...'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: currentResult.project_id,
+        project_name: currentResult.project_name,
+        lat: currentResult.lat, lon: currentResult.lon,
+        area_m2: currentResult.area_m2,
+        project_type: currentResult.project_type,
+        result: currentResult,
+        ai_report: lastAiReport || currentResult?.agent_output?.final_report || ''
+      })
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    if (res.headers.get('content-type')?.includes('pdf')) {
+      a.download = `geoVIA_${currentResult.project_name.replace(/\s/g,'_')}.pdf`;
+      a.click();
+    } else {
+      a.target = '_blank';
+      a.click();
+    }
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Errore PDF: ' + e.message); }
+  finally { btn.textContent = '📄 PDF'; btn.disabled = false; }
+}
+
+function exportGeoJSON() {
+  if (!drawnGeojson) return;
+  const data = JSON.stringify({ type: 'FeatureCollection', features: [drawnGeojson] }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `geoVIA_${document.getElementById('projectName').value || 'area'}.geojson`;
+  a.click();
+}
+
+async function interpretResults(result) {
+  const msgs = document.getElementById('aiMessages');
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'ai-msg ai-msg-ai';
+  loadingDiv.id = 'ai-loading-indicator';
+  loadingDiv.innerHTML = `<div class="ai-msg-sender">VIA Assistant</div><div class="ai-msg-bubble" style="background:#fff8e1;border:1px solid #f39c12">⏳ <strong>Analisi agenti IA in corso...</strong><br><small style="color:#95a5a6">hermes3:8b sta elaborando interpretazione e relazione tecnica. Attendere.</small><br><div class="typing" style="margin-top:6px"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(loadingDiv);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Keep loading indicator always last
+  const _origAddAiMsg = addAiMsg;
+  const keepLast = () => {
+    const ind = document.getElementById('ai-loading-indicator');
+    if (ind) { msgs.appendChild(ind); msgs.scrollTop = msgs.scrollHeight; }
+  };
+
+  try {
+    const res = await fetch('/api/interpret', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        project_name: result.project_name,
+        project_type: result.project_type,
+        indicators: result.indicators,
+        global_score: result.global_score,
+        global_level: result.global_level,
+        via_screening: result.via_screening,
+        lat: result.lat, lon: result.lon, area_m2: result.area_m2,
+        prescriptions: result.prescriptions || {}
+      })
+    });
+    const data = await res.json();
+    document.getElementById('ai-loading-indicator')?.remove();
+    if (data.error) { addAiMsg(`⚠️ Interpretazione AI non disponibile: ${data.error}`, 'ai'); return; }
+
+    // Merge into currentResult
+    currentResult.agent_output = data.agent_output;
+    currentResult.decision_brief = data.decision_brief;
+
+    const ao = data.agent_output;
+    if (ao.risk_interpretation) addAiMsg(`📊 **Interpretazione rischi:**\n${ao.risk_interpretation}`, 'ai');
+    if (ao.norms) addAiMsg(`📋 **Normative applicabili:**\n${ao.norms.refs.join('\n')}\n\n⚖️ ${ao.norms.via_threshold}`, 'ai');
+    if (ao.final_report) {
+      lastAiReport = ao.final_report;
+      addAiMsg(`📄 **Relazione tecnica:**\n\n${ao.final_report}`, 'ai');
+    }
+    // Update brief tab with LLM data
+    renderBrief(currentResult);
+    addAiMsg('✅ <strong>Analisi completata.</strong> Interpretazione rischi, normative e relazione tecnica disponibili. Puoi consultare il tab 🎯 Brief per il decision brief completo.', 'ai');
+  } catch(e) {
+    document.getElementById('ai-loading-indicator')?.remove();
+    addAiMsg(`⚠️ Interpretazione AI: ${e.message}`, 'ai');
+  }
+}
+
+async function enrichAnalysis(lat, lon, projectType, areaM2) {
+  addAiMsg('🔍 Avvio analisi cumulativa, precedenti MASE e portali regionali...', 'ai');
+  try {
+    const res = await fetch('/api/enrich', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({lat, lon, project_type: projectType, area_m2: areaM2, radius_m: 5000})
+    });
+    const data = await res.json();
+
+    // Cumulative
+    if (data.cumulative && !data.cumulative.error) {
+      const c = data.cumulative;
+      const msg = `🏭 **Analisi Cumulativa (buffer ${c.radius_m}m):**\n` +
+        `Pressione: ${c.level} (score ${c.score}/100)\n` +
+        `• Impianti FER: ${c.breakdown.fer_impianti}\n` +
+        `• Impianti industriali: ${c.breakdown.impianti_industriali}\n` +
+        `• Siti SEVESO: ${c.breakdown.siti_seveso}\n` +
+        `• Infrastrutture: ${c.breakdown.infrastrutture}\n` +
+        `Totale: ${c.breakdown.totale} elementi rilevati`;
+      addAiMsg(msg, 'ai');
+      renderCumulativeOnMap(c.plants || []);
+    }
+
+    // Precedents
+    if (data.precedents && !data.precedents.error) {
+      const p = data.precedents;
+      if (p.precedents && p.precedents.length > 0) {
+        let msg = `📚 **Precedenti MASE (${p.total_indexed} indicizzati):**\n`;
+        p.precedents.forEach(pr => {
+          msg += `• ${pr.titolo} (${pr.regione}, ${pr.anno})\n`;
+          if (pr.prescrizioni && pr.prescrizioni !== 'Non disponibile') {
+            msg += `  Prescrizioni: ${pr.prescrizioni.substring(0,100)}...\n`;
+          }
+        });
+        if (p.indexing) msg += `\n⏳ Indicizzazione in corso per nuovi precedenti...`;
+        addAiMsg(msg, 'ai');
+      } else {
+        addAiMsg(`📚 **Precedenti MASE:** ${p.note}`, 'ai');
+      }
+    }
+
+    // Regional
+    if (data.regional && !data.regional.error) {
+      const r = data.regional;
+      let msg = `🏛️ **Portale Regionale ${r.region_name}:**\n${r.note}\n`;
+      if (r.procedures && r.procedures.length > 0) {
+        r.procedures.slice(0,3).forEach(p => {
+          msg += `• ${p.title} → ${p.url}\n`;
+        });
+      } else {
+        msg += `Portale: ${r.portal_url}`;
+      }
+      addAiMsg(msg, 'ai');
+    }
+
+  } catch(e) {
+    addAiMsg(`⚠️ Errore arricchimento: ${e.message}`, 'ai');
+  }
+}
+
+function colorMapByRisk(level, lc) {
+  const color = lc[level] || '#f39c12';
+  const opacity = { 'MOLTO ALTO': 0.45, 'ALTO': 0.35, 'MEDIO': 0.25, 'BASSO': 0.15, 'TRASCURABILE': 0.1 }[level] || 0.2;
+  if (map.getLayer('drawn-fill')) {
+    map.setPaintProperty('drawn-fill', 'fill-color', color);
+    map.setPaintProperty('drawn-fill', 'fill-opacity', opacity);
+    map.setPaintProperty('drawn-line', 'line-color', color);
+    map.setPaintProperty('drawn-line', 'line-width', 3);
+  }
+}
+
+function renderCumulativeOnMap(plants) {
+  if (!map.getSource('cumulative-plants')) {
+    map.addSource('cumulative-plants', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'cumulative-points', type: 'circle', source: 'cumulative-plants',
+      paint: { 'circle-radius': 6, 'circle-color': ['match', ['get', 'category'],
+        'FER', '#f39c12', 'SEVESO', '#e74c3c', 'AIA', '#9b59b6', '#95a5a6'],
+        'circle-opacity': 0.8, 'circle-stroke-width': 1, 'circle-stroke-color': 'white' }
+    });
+  }
+  const features = plants.map(p => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+    properties: {
+      name: p.name, type: p.type, source: p.source,
+      category: p.type.startsWith('FER') ? 'FER' : p.type.includes('SEVESO') ? 'SEVESO' : p.type === 'AIA' ? 'AIA' : 'OTHER'
+    }
+  }));
+  map.getSource('cumulative-plants').setData({ type: 'FeatureCollection', features });
+}
+</script>
+</body>
+</html>
