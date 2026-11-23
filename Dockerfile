@@ -19,4 +19,4 @@ ENV PORT=8002
 
 EXPOSE 8002
 
-CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8002}"]
