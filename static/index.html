@@ -462,7 +462,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #
 // ── MAP INIT ──────────────────────────────────────────────────────────────────
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+  style: 'https://tiles.openfreemap.org/styles/liberty',
   center: [12.5, 41.9],
   zoom: 5.5
 });
@@ -1180,6 +1180,8 @@ function toggleReactMode() {
     document.getElementById('aiInput').placeholder = "Chiedi all'assistente VIA...";
   }
 }
+
+function sendAiChat() {
   const input = document.getElementById('aiInput');
   const msg = input.value.trim();
   if (!msg) return;
@@ -1201,20 +1203,18 @@ function toggleReactMode() {
   } else {
     // HTTP fallback
     addTyping();
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message: msg, conversation: httpConversation})
-      });
-      const data = await res.json();
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, conversation: httpConversation})
+    }).then(r => r.json()).then(data => {
       removeTyping();
       httpConversation = data.conversation || [];
       addAiMsg(data.response || 'Nessuna risposta', 'ai');
-    } catch(e) {
+    }).catch(e => {
       removeTyping();
       addAiMsg(`Errore: ${e.message}`, 'ai');
-    }
+    });
   }
 }
 
