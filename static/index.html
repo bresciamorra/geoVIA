@@ -792,9 +792,20 @@ function mobileShow(panel) {
 document.querySelector('.sidebar-tabs').addEventListener('click', (e) => {
   if (!isMobile()) return;
   const sidebar = document.querySelector('.sidebar');
+  sidebar.classList.toggle('open');
   if (!sidebar.classList.contains('open')) {
-    sidebar.classList.add('open');
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('mnMap').classList.add('active');
   }
+});
+
+// Tap on map closes sidebar and AI panel
+document.getElementById('map').addEventListener('click', () => {
+  if (!isMobile()) return;
+  document.querySelector('.sidebar').classList.remove('open');
+  document.querySelector('.ai-panel').classList.remove('open');
+  document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mnMap').classList.add('active');
 });
 
 // Tap on AI header toggles drawer
