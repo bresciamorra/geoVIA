@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>geoVIA — Admin</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; padding: 24px; }
+.header { background: #1a252f; color: white; padding: 16px 24px; border-radius: 10px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 18px; }
+.header span { font-size: 12px; color: #95a5a6; }
+table { width: 100%; background: white; border-radius: 10px; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+th { background: #2c3e50; color: white; padding: 12px 16px; text-align: left; font-size: 12px; text-transform: uppercase; }
+td { padding: 12px 16px; border-bottom: 1px solid #f0f2f5; font-size: 13px; }
+tr:last-child td { border-bottom: none; }
+.badge { padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.badge-pending { background: #fff3cd; color: #856404; }
+.badge-free { background: #d4edda; color: #155724; }
+.badge-premium { background: #cce5ff; color: #004085; }
+.btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.btn-free { background: #27ae60; color: white; }
+.btn-premium { background: #2c3e50; color: white; margin-left: 6px; }
+.btn-free:hover { background: #219a52; }
+.btn-premium:hover { background: #3498db; }
+.empty { text-align: center; padding: 40px; color: #95a5a6; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🌍 geoVIA — Pannello Admin</h1>
+  <span id="count">Caricamento...</span>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>Email</th>
+      <th>Profilo</th>
+      <th>Registrato</th>
+      <th>Azioni</th>
+    </tr>
+  </thead>
+  <tbody id="userList">
+    <tr><td colspan="4" class="empty">Caricamento...</td></tr>
+  </tbody>
+</table>
+
+<script>
+const key = new URLSearchParams(location.search).get('key');
+
+async function loadUsers() {
+  const res = await fetch(`/admin/api/users?key=${key}`);
+  if (res.status === 403) {
+    document.body.innerHTML = '<div style="text-align:center;padding:60px;font-size:18px;color:#e74c3c">❌ Accesso non autorizzato</div>';
+    return;
+  }
+  const users = await res.json();
+  document.getElementById('count').textContent = `${users.length} utenti`;
+  if (!users.length) {
+    document.getElementById('userList').innerHTML = '<tr><td colspan="4" class="empty">Nessun utente registrato</td></tr>';
+    return;
+  }
+  document.getElementById('userList').innerHTML = users.map(u => `
+    <tr>
+      <td><strong>${u.email}</strong></td>
+      <td><span class="badge badge-${u.profile}">${u.profile.toUpperCase()}</span></td>
+      <td style="color:#95a5a6">${u.created_at?.split('T')[0] || 'N/D'}</td>
+      <td>
+        ${u.profile === 'pending' ? `
+          <button class="btn btn-free" onclick="approve('${u.email}','free')">✅ FREE</button>
+          <button class="btn btn-premium" onclick="approve('${u.email}','premium')">⭐ PREMIUM</button>
+        ` : `
+          <button class="btn btn-free" onclick="approve('${u.email}','free')" ${u.profile==='free'?'disabled':''}>FREE</button>
+          <button class="btn btn-premium" onclick="approve('${u.email}','premium')" ${u.profile==='premium'?'disabled':''}>PREMIUM</button>
+        `}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function approve(email, profile) {
+  const res = await fetch(`/admin/api/approve?key=${key}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email, profile})
+  });
+  const data = await res.json();
+  if (data.ok) loadUsers();
+  else alert('Errore: ' + data.error);
+}
+
+loadUsers();
+</script>
+</body>
+</html>

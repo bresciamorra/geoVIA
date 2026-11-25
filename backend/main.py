@@ -2,7 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, D
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, Response, JSONResponse, RedirectResponse
 from pydantic import BaseModel
-import httpx, json, os, traceback, asyncio
+import httpx, json, os, traceback, asyncio, sqlite3
 import numpy as np
 
 class NumpyEncoder(json.JSONEncoder):
@@ -130,6 +130,37 @@ async def auth_approve(token: str):
 async def auth_logout(response: Response):
     response.delete_cookie("geovia_token")
     return {"ok": True}
+
+@app.get("/admin/users")
+async def admin_page(key: str = ""):
+    admin_key = os.getenv("ADMIN_KEY", "geovia-admin-2026")
+    if key != admin_key:
+        return HTMLResponse("<h2>Accesso non autorizzato</h2>", status_code=403)
+    with open("static/admin.html") as f:
+        return HTMLResponse(f.read())
+
+class ApproveRequest(BaseModel):
+    email: str
+    profile: str
+
+@app.get("/admin/api/users")
+async def admin_list_users(key: str = ""):
+    admin_key = os.getenv("ADMIN_KEY", "geovia-admin-2026")
+    if key != admin_key:
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    db_path = os.getenv("DB_PATH", "data/geovia.db")
+    conn = sqlite3.connect(db_path)
+    rows = conn.execute("SELECT email, profile, created_at FROM users ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [{"email": r[0], "profile": r[1], "created_at": r[2]} for r in rows]
+
+@app.post("/admin/api/approve")
+async def admin_approve_user(req: ApproveRequest, key: str = ""):
+    admin_key = os.getenv("ADMIN_KEY", "geovia-admin-2026")
+    if key != admin_key:
+        return JSONResponse({"error": "unauthorized"}, status_code=403)
+    ok = approve_user(req.email, req.profile)
+    return {"ok": ok}
 
 @app.get("/api/me")
 async def get_me(request: Request):
