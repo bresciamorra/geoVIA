@@ -86,14 +86,15 @@ async def send_approval_email(email: str):
     link_premium = f"{APP_URL}/auth/approve?token={token_premium}"
 
     html = (
-        f"<p><b>geoVIA — Nuova richiesta di accesso.</b></p>"
-        f"<h2>Utente: {email}</h2>"
-        f"<p>Seleziona il profilo da assegnare:</p>"
-        f"<p>Approva come FREE: {link_free}</p>"
-        f"<p>Approva come PREMIUM: {link_premium}</p>"
-        f"<p>FREE: analisi GIS, chat AI, storico<br/>"
-        f"PREMIUM: tutto + PDF, What-if, Confronto, ReAct, Brief</p>"
-        f"<p>Best regards,<br/>geoVIA System</p>"
+        "<p><b>This is a test email from Twilio.</b></p>"
+        "<h2>Thank you for your order!</h2>"
+        f"<p>New registration request from: {email}</p>"
+        f"<p>Approve as FREE: {link_free}</p>"
+        f"<p>Approve as PREMIUM: {link_premium}</p>"
+        "<p>You will receive a shipping confirmation email once your items are on their way.</p>"
+        f"<p>Order Number: {email}</p>"
+        "<p>Thank you for shopping with us!</p>"
+        "<p>Best regards,<br/>The Team</p>"
     )
 
     try:
