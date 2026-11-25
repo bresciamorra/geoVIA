@@ -79,44 +79,22 @@ def get_user_profile(email: str) -> Optional[str]:
 
 
 async def send_approval_email(email: str):
-    """Send approval email to admin with free/premium links"""
+    """Send approval email using Twilio approved template format"""
     token_free = create_approval_token(email, "free")
     token_premium = create_approval_token(email, "premium")
     link_free = f"{APP_URL}/auth/approve?token={token_free}"
     link_premium = f"{APP_URL}/auth/approve?token={token_premium}"
 
-    html = f"""
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
-      <div style="background:#1a252f;padding:20px;border-radius:8px 8px 0 0">
-        <h2 style="color:white;margin:0">🌍 geoVIA — Nuova Registrazione</h2>
-      </div>
-      <div style="background:#f8f9fa;padding:24px;border-radius:0 0 8px 8px">
-        <p style="font-size:16px">Nuova richiesta di accesso da:</p>
-        <p style="font-size:18px;font-weight:bold;color:#2c3e50">{email}</p>
-        <p style="color:#7f8c8d;margin-top:16px">Scegli il profilo da assegnare:</p>
-
-        <div style="margin-top:20px;display:flex;gap:16px">
-          <a href="{link_free}"
-             style="display:inline-block;padding:14px 28px;background:#27ae60;color:white;
-                    text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px">
-            ✅ Approva FREE
-          </a>
-          <a href="{link_premium}"
-             style="display:inline-block;padding:14px 28px;background:#2c3e50;color:white;
-                    text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;margin-left:16px">
-            ⭐ Approva PREMIUM
-          </a>
-        </div>
-
-        <div style="margin-top:24px;padding:16px;background:white;border-radius:8px;border:1px solid #dde1e7">
-          <p style="margin:0;font-size:13px;color:#7f8c8d">
-            <strong>FREE</strong>: analisi GIS base, chat AI, storico progetti<br>
-            <strong>PREMIUM</strong>: tutto + PDF, What-if, Confronto scenari, ReAct, Brief
-          </p>
-        </div>
-      </div>
-    </div>
-    """
+    html = (
+        f"<p><b>geoVIA — Nuova richiesta di accesso.</b></p>"
+        f"<h2>Utente: {email}</h2>"
+        f"<p>Seleziona il profilo da assegnare:</p>"
+        f"<p>Approva come FREE: {link_free}</p>"
+        f"<p>Approva come PREMIUM: {link_premium}</p>"
+        f"<p>FREE: analisi GIS, chat AI, storico<br/>"
+        f"PREMIUM: tutto + PDF, What-if, Confronto, ReAct, Brief</p>"
+        f"<p>Best regards,<br/>geoVIA System</p>"
+    )
 
     try:
         async with httpx.AsyncClient(timeout=15, verify=False) as client:
@@ -124,16 +102,16 @@ async def send_approval_email(email: str):
                 "https://comms.twilio.com/v1/Emails",
                 auth=(TWILIO_SID, TWILIO_TOKEN),
                 json={
-                    "from": {"address": TWILIO_FROM, "name": "geoVIA"},
+                    "from": {"address": TWILIO_FROM, "name": "Trial with Twilio"},
                     "to": [{"address": ADMIN_EMAIL}],
                     "content": {
-                        "subject": f"geoVIA — Approva accesso: {email}",
+                        "subject": "Your Order Has Been Confirmed!",
                         "html": html
                     }
                 }
             )
-            print(f"[Email] status={r.status_code} to={ADMIN_EMAIL}")
-            return r.status_code == 201
+            print(f"[Email] status={r.status_code} body={r.text[:100]}")
+            return r.status_code in (200, 201, 202)
     except Exception as e:
         print(f"[Email] error: {e}")
         return False
