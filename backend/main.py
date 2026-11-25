@@ -22,7 +22,7 @@ from backend.risk_engine import (assess_hydrogeological, assess_seismic, assess_
                                   compute_global_risk)
 from backend.connectors import fetch_all_data
 from backend.agents_legacy import run_agents
-from backend.auth import init_auth_db, register_user, login_user, verify_token
+from backend.auth import init_auth_db, register_user_pending, login_user, verify_token, approve_user, send_approval_email
 from backend.modules.cumulative import analyze_cumulative
 from backend.modules.mase_rag import get_mase_precedents
 from backend.modules.regional import get_regional_procedures, coords_to_region
@@ -101,12 +101,45 @@ async def auth_login(req: AuthRequest, response: Response):
 
 @app.post("/auth/register")
 async def auth_register(req: AuthRequest):
-    return register_user(req.email, req.password)
+    result = register_user_pending(req.email, req.password)
+    if result["ok"]:
+        await send_approval_email(req.email)
+    return result
+
+@app.get("/auth/approve")
+async def auth_approve(token: str):
+    from backend.auth import verify_token
+    payload = verify_token(token)
+    if not payload or payload.get("action") != "approve":
+        return HTMLResponse("<h2>Link non valido o scaduto.</h2>", status_code=400)
+    email = payload["sub"]
+    profile = payload["profile"]
+    approve_user(email, profile)
+    return HTMLResponse(f"""
+    <html><body style="font-family:Arial;text-align:center;padding:60px;background:#f0f2f5">
+      <div style="background:white;border-radius:12px;padding:40px;max-width:400px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+        <div style="font-size:48px">{'⭐' if profile == 'premium' else '✅'}</div>
+        <h2 style="color:#1a252f">Accesso approvato!</h2>
+        <p style="color:#7f8c8d"><strong>{email}</strong> ha ora accesso <strong>{profile.upper()}</strong> a geoVIA.</p>
+        <p style="color:#95a5a6;font-size:13px">L'utente può ora accedere con le sue credenziali.</p>
+      </div>
+    </body></html>
+    """)
 
 @app.post("/auth/logout")
 async def auth_logout(response: Response):
     response.delete_cookie("geovia_token")
     return {"ok": True}
+
+@app.get("/api/me")
+async def get_me(request: Request):
+    token = request.cookies.get("geovia_token")
+    if not token:
+        return {"email": None, "profile": None}
+    payload = verify_token(token)
+    if not payload:
+        return {"email": None, "profile": None}
+    return {"email": payload.get("sub"), "profile": payload.get("profile", "free")}
 
 @app.get("/api/geocode")
 async def geocode(q: str):

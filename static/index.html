@@ -235,6 +235,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #
     <span class="badge" id="modelBadge">⚡ hermes3 + mistral</span>
     <span>ISPRA · INGV · Natura2000 · CORINE · OpenAQ</span>
     <span id="wsStatus" style="color:#e74c3c">● offline</span>
+    <span id="userEmail" style="font-size:11px;color:#95a5a6"></span>
     <button onclick="fetch('/auth/logout',{method:'POST'}).then(()=>location.href='/login')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px">Esci</button>
   </div>
 </div>
@@ -482,6 +483,48 @@ let drawPoints = [];
 let drawMarkers = [];
 let activeBuffers = [100, 500, 1000];
 let docTexts = [];
+let userProfile = 'free';
+
+// Load user profile and apply restrictions
+fetch('/api/me').then(r=>r.json()).then(data => {
+  userProfile = data.profile || 'free';
+  if (userProfile === 'free') applyFreeRestrictions();
+  const emailEl = document.getElementById('userEmail');
+  if (emailEl && data.email) emailEl.textContent = data.email;
+});
+
+function applyFreeRestrictions() {
+  const premiumFeatures = [
+    {id: 'btnReactMode', label: '🧠 ReAct'},
+    {selector: 'button[onclick="exportPdf()"]', label: '📄 PDF'},
+    {selector: 'button[onclick="runWhatif()"]', label: '🔬 What-if'},
+    {selector: 'button[onclick="runComparison()"]', label: '⚖️ Confronto'},
+  ];
+  premiumFeatures.forEach(f => {
+    const el = f.id ? document.getElementById(f.id) : document.querySelector(f.selector);
+    if (!el) return;
+    el.disabled = true;
+    el.style.opacity = '0.4';
+    el.style.cursor = 'not-allowed';
+    el.title = '⭐ Funzione Premium — contatta abm@virgilio.it per l\'upgrade';
+    el.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      addAiMsg('⭐ Questa funzione è disponibile nel piano <strong>Premium</strong>. Contatta abm@virgilio.it per l\'upgrade.', 'ai');
+    }, true);
+  });
+  // Grey out premium tabs
+  ['brief','whatif','confronto'].forEach(tab => {
+    const t = document.querySelector(`.tab[onclick="switchTab('${tab}')"]`);
+    if (t) {
+      t.style.opacity = '0.4';
+      t.title = '⭐ Piano Premium';
+      t.onclick = (e) => {
+        e.preventDefault();
+        addAiMsg('⭐ Questa sezione è disponibile nel piano <strong>Premium</strong>. Contatta abm@virgilio.it per l\'upgrade.', 'ai');
+      };
+    }
+  });
+}
 
 // ── MAPLIBRE DRAW (manual polygon) ───────────────────────────────────────────
 map.on('load', () => {
