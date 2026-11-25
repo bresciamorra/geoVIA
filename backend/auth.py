@@ -85,12 +85,12 @@ async def send_approval_email(email: str):
     link_free = f"{APP_URL}/auth/approve?token={token_free}"
     link_premium = f"{APP_URL}/auth/approve?token={token_premium}"
 
+    # Twilio trial only accepts exact template HTML — put links in subject
+    subject = f"geoVIA approval: FREE={link_free} | PREMIUM={link_premium}"
     html = (
         "<p><b>This is a test email from Twilio.</b></p>"
         "<h2>Thank you for your order!</h2>"
-        f"<p>New registration request from: {email}</p>"
-        f"<p>Approve as FREE: {link_free}</p>"
-        f"<p>Approve as PREMIUM: {link_premium}</p>"
+        "<p>We are excited to let you know that your order has been confirmed and is being processed.</p>"
         "<p>You will receive a shipping confirmation email once your items are on their way.</p>"
         f"<p>Order Number: {email}</p>"
         "<p>Thank you for shopping with us!</p>"
@@ -106,7 +106,7 @@ async def send_approval_email(email: str):
                     "from": {"address": TWILIO_FROM, "name": "Trial with Twilio"},
                     "to": [{"address": ADMIN_EMAIL}],
                     "content": {
-                        "subject": "Your Order Has Been Confirmed!",
+                        "subject": subject,
                         "html": html
                     }
                 }
