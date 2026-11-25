@@ -272,11 +272,13 @@ def _is_coastal_italy(lat: float, lon: float, buffer_deg: float = 0.08) -> tuple
         # Check if point is within coastal zone (with buffer)
         if (lat_min - buffer_deg <= lat <= lat_max + buffer_deg and
                 lon_min - buffer_deg <= lon <= lon_max + buffer_deg):
-            # Estimate distance to coast edge
+            # Estimate distance to nearest coast edge
             dist_lat = min(abs(lat - lat_min), abs(lat - lat_max)) * 111000
             dist_lon = min(abs(lon - lon_min), abs(lon - lon_max)) * 111000 * 0.7
             dist_m = min(dist_lat, dist_lon)
-            return True, dist_m, sea
+            # Only mark as coastal if within 5km of coast edge
+            if dist_m < 5000:
+                return True, dist_m, sea
     return False, 50000, ""
 
 

@@ -235,6 +235,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #
     <span class="badge" id="modelBadge">⚡ hermes3 + mistral</span>
     <span>ISPRA · INGV · Natura2000 · CORINE · OpenAQ</span>
     <span id="wsStatus" style="color:#e74c3c">● offline</span>
+    <button onclick="fetch('/auth/logout',{method:'POST'}).then(()=>location.href='/login')" style="background:none;border:1px solid #e74c3c;color:#e74c3c;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px">Esci</button>
   </div>
 </div>
 

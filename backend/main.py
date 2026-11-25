@@ -1,6 +1,6 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Depends, Response, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 import httpx, json, os, traceback, asyncio
 import numpy as np
@@ -22,6 +22,7 @@ from backend.risk_engine import (assess_hydrogeological, assess_seismic, assess_
                                   compute_global_risk)
 from backend.connectors import fetch_all_data
 from backend.agents_legacy import run_agents
+from backend.auth import init_auth_db, register_user, login_user, verify_token
 from backend.modules.cumulative import analyze_cumulative
 from backend.modules.mase_rag import get_mase_precedents
 from backend.modules.regional import get_regional_procedures, coords_to_region
@@ -71,11 +72,41 @@ Non inventare mai dati che non conosci — dichiaralo chiaramente."""
 @app.on_event("startup")
 async def startup():
     init_db()
+    init_auth_db()
 
 @app.get("/")
-async def index():
+async def index(request: Request):
+    token = request.cookies.get("geovia_token")
+    if not token or not verify_token(token):
+        return RedirectResponse("/login", status_code=302)
     with open("static/index.html") as f:
         return HTMLResponse(f.read())
+
+@app.get("/login")
+async def login_page():
+    with open("static/login.html") as f:
+        return HTMLResponse(f.read())
+
+class AuthRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/auth/login")
+async def auth_login(req: AuthRequest, response: Response):
+    result = login_user(req.email, req.password)
+    if result["ok"]:
+        response.set_cookie("geovia_token", result["token"],
+                            max_age=30*24*3600, httponly=True, samesite="lax")
+    return result
+
+@app.post("/auth/register")
+async def auth_register(req: AuthRequest):
+    return register_user(req.email, req.password)
+
+@app.post("/auth/logout")
+async def auth_logout(response: Response):
+    response.delete_cookie("geovia_token")
+    return {"ok": True}
 
 @app.get("/api/geocode")
 async def geocode(q: str):
