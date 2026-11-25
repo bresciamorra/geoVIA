@@ -85,17 +85,18 @@ async def send_approval_email(email: str):
     link_free = f"{APP_URL}/auth/approve?token={token_free}"
     link_premium = f"{APP_URL}/auth/approve?token={token_premium}"
 
-    # Twilio trial only accepts exact template HTML — put links in subject
-    subject = f"geoVIA approval: FREE={link_free} | PREMIUM={link_premium}"
+    # Twilio trial: exact HTML + exact subject required
+    # Links go in Order Number field only
     html = (
         "<p><b>This is a test email from Twilio.</b></p>"
         "<h2>Thank you for your order!</h2>"
         "<p>We are excited to let you know that your order has been confirmed and is being processed.</p>"
         "<p>You will receive a shipping confirmation email once your items are on their way.</p>"
-        f"<p>Order Number: {email}</p>"
+        f"<p>Order Number: {email} | FREE: {link_free} | PREMIUM: {link_premium}</p>"
         "<p>Thank you for shopping with us!</p>"
         "<p>Best regards,<br/>The Team</p>"
     )
+    subject = "Your Order Has Been Confirmed!"
 
     try:
         async with httpx.AsyncClient(timeout=15, verify=False) as client:
